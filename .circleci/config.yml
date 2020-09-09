@@ -13,4 +13,4 @@ jobs:
       - run:
           name: Unit Test
           command: |
-            python tests/registration_test.py
+            python securedrop/tests/registration_test.py

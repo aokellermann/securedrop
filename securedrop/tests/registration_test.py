@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from securedrop import Client
+from securedrop.client import Client
 import os
 import json
 

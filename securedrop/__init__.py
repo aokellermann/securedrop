@@ -1,3 +1,3 @@
-__all__ = ['client']
+__all__ = ['Client']
 
 from securedrop.client import Client
