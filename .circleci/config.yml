@@ -1,0 +1,16 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: archlinux
+
+    steps:
+      - checkout
+      - run:
+          name: Install required tools
+          command: pacman -Sy --noconfirm base base-devel git python python-json5
+      - run:
+          name: Unit Test
+          command: |
+            python tests/registration_test.py
