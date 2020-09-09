@@ -65,17 +65,19 @@ class ClientData:
 
 class RegisteredUsers:
     users = dict()
+    filename: str
 
     def __init__(self, filename):
+        self.filename = filename
         if os.path.exists(filename):
             with open(filename, 'r') as f:
                 jdict = json.load(f)
                 for email, cd in jdict.items():
                     self.users[email] = ClientData(jdict=cd)
         else:
-            decision = input("No users are registered with this client.\nDo you want to register a new user (y/n)?")
+            decision = input("No users are registered with this client.\nDo you want to register a new user (y/n)? ")
             if str(decision) == 'y':
-                self.register_new_user()
+                self.register_new_user(self.filename)
             else:
                 raise RuntimeError("You must register a user before using securedrop")
 
@@ -86,14 +88,14 @@ class RegisteredUsers:
         with open(filename, 'w') as f:
             json.dump(self.make_dict(), f)
 
-    def register_new_user(self):
+    def register_new_user(self, filename):
         name = input("Enter Full Name: ")
         email = input("Enter Email Address: ")
         if email in self.users:
             raise RuntimeError("That email already exists!")
 
         pw1 = getpass.getpass(prompt="Enter Password: ")
-        pw2 = getpass.getpass(prompt="Enter Password Again: ")
+        pw2 = getpass.getpass(prompt="Re-enter password: ")
         if name and email and pw1 and pw2:
             salt = make_salt()
             auth1 = Authentication(str(pw1), salt)
@@ -101,7 +103,10 @@ class RegisteredUsers:
             if auth1 != auth2:
                 raise RuntimeError("The two entered passwords don't match!")
 
+            print("Passwords Match.")
             self.users[email] = ClientData(name, email, [], pw1)
+            self.write_json(filename)
+            print("User Registered.")
         else:
             raise RuntimeError("Invalid input")
 
@@ -111,4 +116,4 @@ class Client:
 
     def __init__(self, filename):
         self.users = RegisteredUsers(filename)
-        self.users.write_json(filename)
+        print("Exiting SecureDrop")
