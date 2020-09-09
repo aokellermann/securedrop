@@ -4,7 +4,6 @@ import os
 import hashlib
 import base64
 
-sd_filename = 'securedrop.json'
 
 
 def make_salt():
@@ -107,14 +106,9 @@ class RegisteredUsers:
             raise RuntimeError("Invalid input")
 
 
-users = None
+class Client:
+    users: RegisteredUsers
 
-
-def main():
-    global users
-    users = RegisteredUsers(sd_filename)
-    users.write_json(sd_filename)
-
-
-if __name__ == "__main__":
-    main()
+    def __init__(self, filename):
+        self.users = RegisteredUsers(filename)
+        self.users.write_json(filename)
