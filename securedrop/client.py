@@ -5,7 +5,6 @@ import hashlib
 import base64
 
 
-
 def make_salt():
     return os.urandom(32)
 
@@ -39,9 +38,10 @@ class Authentication:
 
 
 class ClientData:
+    # todo: encrypt name and contacts
     name: str
     email: str
-    contacts: list
+    contacts: dict
     auth: Authentication
 
     def __init__(self, nm=None, em=None, cs=None, password=None, jdict=None):
@@ -74,12 +74,6 @@ class RegisteredUsers:
                 jdict = json.load(f)
                 for email, cd in jdict.items():
                     self.users[email] = ClientData(jdict=cd)
-        else:
-            decision = input("No users are registered with this client.\nDo you want to register a new user (y/n)? ")
-            if str(decision) == 'y':
-                self.register_new_user(self.filename)
-            else:
-                raise RuntimeError("You must register a user before using securedrop")
 
     def make_dict(self):
         return {email: data.make_dict() for email, data in self.users.items()}
@@ -107,6 +101,7 @@ class RegisteredUsers:
             self.users[email] = ClientData(name, email, [], pw1)
             self.write_json(filename)
             print("User Registered.")
+            return self.users[email]
         else:
             raise RuntimeError("Invalid input")
 
@@ -115,5 +110,56 @@ class Client:
     users: RegisteredUsers
 
     def __init__(self, filename):
-        self.users = RegisteredUsers(filename)
-        print("Exiting SecureDrop")
+        try:
+            self.users = RegisteredUsers(filename)
+            if not self.users.users:
+                decision = input(
+                    "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
+                if str(decision) == 'y':
+                    user = self.users.register_new_user(filename)
+                    self.login(user)
+                else:
+                    raise RuntimeError("You must register a user before using securedrop")
+
+        except Exception as e:
+            print("Exiting SecureDrop")
+            raise e
+
+    def login(self, user=None):
+        try:
+            if not user:
+                email = input("Enter Email Address: ")
+                pw = getpass.getpass(prompt="Enter Password: ")
+
+                if email not in self.users.users:
+                    raise RuntimeError("That email address is not registered")
+
+                user = self.users.users[email]
+                auth = Authentication(str(pw), user.auth.salt)
+                if auth != self.users.users[email].auth:
+                    raise RuntimeError("Email and Password Combination Invalid.")
+
+            print("Welcome to SecureDrop")
+            print("Type \"help\" For Commands")
+
+            while True:
+                command = input("secure_drop> ")
+                if command == "help":
+                    print("\"add\"  \t-> Add a new contact")
+                    print("\"list\"  \t-> List all online contacts")
+                    print("\"send\"  \t-> Transfer file to contact")
+                    print("\"exit\"  \t-> Exit SecureDrop")
+                elif command == "add":
+                    pass
+                elif command == "list":
+                    pass
+                elif command == "send":
+                    pass
+                elif command == "exit":
+                    break
+
+        except Exception as e:
+            print("Exiting SecureDrop")
+            raise e
+        else:
+            print("Exiting SecureDrop")
