@@ -13,5 +13,4 @@ jobs:
       - run:
           name: Unit Test
           command: |
-            cd securedrop/tests
-            python registration_test.py
+            PYTHONPATH=$PYTHONPATH:. python securedrop/tests/registration_test.py
