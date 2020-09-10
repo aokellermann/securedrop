@@ -78,8 +78,8 @@ class RegisteredUsers:
     def make_dict(self):
         return {email: data.make_dict() for email, data in self.users.items()}
 
-    def write_json(self, filename):
-        with open(filename, 'w') as f:
+    def write_json(self):
+        with open(self.filename, 'w') as f:
             json.dump(self.make_dict(), f)
 
     def register_new_user(self, filename):
@@ -98,8 +98,8 @@ class RegisteredUsers:
                 raise RuntimeError("The two entered passwords don't match!")
 
             print("Passwords Match.")
-            self.users[email] = ClientData(name, email, [], pw1)
-            self.write_json(filename)
+            self.users[email] = ClientData(name, email, {}, pw1)
+            self.write_json()
             print("User Registered.")
             return self.users[email]
         else:
@@ -150,6 +150,13 @@ class Client:
                     print("\"send\"  \t-> Transfer file to contact")
                     print("\"exit\"  \t-> Exit SecureDrop")
                 elif command == "add":
+                    name = input("Enter Full Name: ")
+                    email = input("Enter Email Address: ")
+                    if name and email:
+                        user.contacts[email] = name
+                        self.users.write_json()
+                    else:
+                        print("Name and email must both be non-empty.")
                     pass
                 elif command == "list":
                     pass
