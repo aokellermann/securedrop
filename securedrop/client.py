@@ -82,7 +82,7 @@ class RegisteredUsers:
         with open(self.filename, 'w') as f:
             json.dump(self.make_dict(), f)
 
-    def register_new_user(self, filename):
+    def register_new_user(self):
         name = input("Enter Full Name: ")
         email = input("Enter Email Address: ")
         if email in self.users:
