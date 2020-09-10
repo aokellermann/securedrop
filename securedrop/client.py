@@ -116,7 +116,7 @@ class Client:
                 decision = input(
                     "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
                 if str(decision) == 'y':
-                    user = self.users.register_new_user(filename)
+                    user = self.users.register_new_user()
                     self.login(user)
                 else:
                     raise RuntimeError("You must register a user before using securedrop")
