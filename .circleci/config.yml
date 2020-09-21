@@ -12,6 +12,4 @@ jobs:
           command: pacman -Sy --noconfirm base base-devel git python python-json5
       - run:
           name: Unit Test
-          command: |
-            PYTHONPATH=$PYTHONPATH:. python securedrop/tests/registration_test.py
-            bash scripts/keygen.sh < scripts/key_test_input_server.txt
+          command: ./scripts/test.sh
