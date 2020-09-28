@@ -16,11 +16,6 @@ class PacketHeader:
         self.total = int.from_bytes(data[2 * PacketHeaderElementSize:3 * PacketHeaderElementSize],
                                     byteorder='little') if data is not None else total
 
-        # name_len = len(self.name)
-        # assert name_len == PacketHeaderElementSize
-        # assert 0 <= self.index < self.total
-        # assert 0 <= self.total
-
     def __bytes__(self):
         return self.name + self.index.to_bytes(PacketHeaderElementSize, byteorder='little') + \
                self.total.to_bytes(4, byteorder='little')
@@ -74,11 +69,10 @@ class Command:
         self.events = events
         self.conversation = ConversationData()
         self.conversation.outbound_packets = Packets(name=name, message=message)
-        self.response = b""
 
-    def run(self, sentinel):
+    def run(self, sentinel, return_obj, return_obj_key):
         self.setup()
-        return self.select_until_complete(sentinel)
+        self.select_until_complete(sentinel, return_obj, return_obj_key)
 
     def setup(self):
         self.sock.setblocking(False)
@@ -86,14 +80,13 @@ class Command:
         self.sel.register(self.sock, self.events)
         print("client connected to", self.address)
 
-    def select_until_complete(self, sentinel):
+    def select_until_complete(self, sentinel, return_obj, return_obj_key):
         while not self.conversation.fully_received and not sentinel():
             if events := self.sel.select(timeout=1):
                 for _, mask in events:
                     self.service(mask)
 
-        self.response = self.conversation.inbound_packets.get_message()
-        return self.response
+        return_obj[return_obj_key] = self.conversation.inbound_packets.get_message()
 
     def service(self, mask):
         if mask & selectors.EVENT_READ:
@@ -103,14 +96,16 @@ class Command:
                 packet = Packet(data=recv_data)
                 self.conversation.inbound_packets.packets.append(packet)
                 self.conversation.fully_received = packet.is_last
-                if self.conversation.fully_received:
-                    print("client closing connection")
-                    self.sel.unregister(self.sock)
-                    self.sock.close()  # TODO: figure out if we should close here
         if mask & selectors.EVENT_WRITE:
             if self.conversation.outbound_packets.packets:
-                print("client sending", bytes(self.conversation.outbound_packets.packets[0]))
-                self.sock.send(bytes(self.conversation.outbound_packets.packets.pop()))
+                out_packet = self.conversation.outbound_packets.packets.pop()
+                self.conversation.fully_sent = out_packet.is_last
+                self.sock.send(bytes(out_packet))
+                print("client sending", bytes(out_packet))
+        if self.conversation.is_complete():
+            print("client closing connection")
+            self.sel.unregister(self.sock)
+            self.sock.close()  # TODO: figure out if we should close here
 
 
 class CommandReceiver:

@@ -4,6 +4,7 @@ import threading
 import time
 import socket
 from multiprocessing import Process
+from multiprocessing import Manager
 
 import securedrop.command as command
 
@@ -25,6 +26,9 @@ class Timer:
 
 
 class EchoServer(command.CommandReceiver):
+    def __init__(self, host: str, prt: int, sock, sel):
+        super().__init__(host, prt, sock, sel, selectors.EVENT_READ | selectors.EVENT_WRITE)
+
     def on_command_received(self, conversation):
         with conversation.lock:
             msg = conversation.inbound_packets.get_message()
@@ -57,36 +61,75 @@ class MyTestCase(unittest.TestCase):
             self.assertEqual(cmd.conversation.outbound_packets.packets[i].header.total, 36)
 
     def test_command_echo(self):
-        sel1 = selectors.DefaultSelector()
-        sel2 = selectors.DefaultSelector()
-        sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock1.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        cmd = command.Command(hostname, port, sock1, sel1, selectors.EVENT_READ | selectors.EVENT_WRITE, b"echo",
+        client_sel = selectors.DefaultSelector()
+        server_sel = selectors.DefaultSelector()
+        client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        cmd = command.Command(hostname, port, client_sock, client_sel, selectors.EVENT_READ | selectors.EVENT_WRITE,
+                              b"echo",
                               b"data")
-        recv = EchoServer(hostname, port, sock2, sel2, selectors.EVENT_READ | selectors.EVENT_WRITE)
+        recv = EchoServer(hostname, port, server_sock, server_sel)
         timer = Timer(5).start()
         server = None
-        resp = None
+        resp = [None]
         ex = False
         try:
             server = Process(target=recv.run, args=(timer.is_triggered,))
             server.start()
             time.sleep(1)
-            resp = cmd.run(timer.is_triggered)
+            cmd.run(timer.is_triggered, resp, 0)
         except Exception:
             ex = True
         finally:
-            sock1.close()
-            sock2.close()
-            sel1.close()
-            sel2.close()
             if server:
                 server.terminate()
+            client_sock.close()
+            server_sock.close()
+            client_sel.close()
+            server_sel.close()
 
         self.assertFalse(ex)
-        self.assertEqual(resp, b"data")
+        self.assertEqual(resp[0], b"data")
+
+    def test_command_echo_concurrent(self):
+        clients = 5
+        client_sels = [selectors.DefaultSelector() for _ in range(clients)]
+        server_sel = selectors.DefaultSelector()
+        client_socks = [socket.socket(socket.AF_INET, socket.SOCK_STREAM) for _ in range(clients)]
+        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        [client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) for client_sock in client_socks]
+        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        cmds = [command.Command(hostname, port, client_socks[i], client_sels[i],
+                                selectors.EVENT_READ | selectors.EVENT_WRITE,
+                                b"echo",
+                                b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
+        recv = EchoServer(hostname, port, server_sock, server_sel)
+        timer = Timer(5).start()
+        manager = Manager()
+        resps = manager.dict()
+        server = None
+        ex = False
+        try:
+            server = Process(target=recv.run, args=(timer.is_triggered,))
+            server.start()
+            time.sleep(1)
+            client_threads = [Process(target=cmds[i].run, args=(timer.is_triggered, resps, i,)) for i in range(clients)]
+            [client.start() for client in client_threads]
+            [client.join() for client in client_threads]
+        except Exception:
+            ex = True
+        finally:
+            if server:
+                server.terminate()
+            [client_sock.close() for client_sock in client_socks]
+            server_sock.close()
+            [client_sel.close() for client_sel in client_sels]
+            server_sel.close()
+
+        self.assertFalse(ex)
+        [self.assertEqual(resps[i], b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
 
 
 if __name__ == '__main__':
