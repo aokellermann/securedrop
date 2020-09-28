@@ -7,7 +7,6 @@ from multiprocessing import Process
 
 import securedrop.command as command
 
-
 hostname = ''
 port = 6969
 
@@ -29,7 +28,7 @@ class EchoServer(command.CommandReceiver):
     def on_command_received(self, conversation):
         with conversation.lock:
             msg = conversation.inbound_packets.get_message()
-            packets = command.Packets(name=b"echo", data=msg)
+            packets = command.Packets(name=b"echo", message=msg)
             conversation.outbound_packets = packets
 
 
@@ -64,16 +63,20 @@ class MyTestCase(unittest.TestCase):
         sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock1.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        cmd = command.Command(hostname, port, sock1, sel1, selectors.EVENT_READ | selectors.EVENT_WRITE, b"echo", b"data")
+        cmd = command.Command(hostname, port, sock1, sel1, selectors.EVENT_READ | selectors.EVENT_WRITE, b"echo",
+                              b"data")
         recv = EchoServer(hostname, port, sock2, sel2, selectors.EVENT_READ | selectors.EVENT_WRITE)
         timer = Timer(5).start()
         server = None
+        resp = None
+        ex = False
         try:
             server = Process(target=recv.run, args=(timer.is_triggered,))
             server.start()
             time.sleep(1)
             resp = cmd.run(timer.is_triggered)
-            self.assertEqual(resp, b"data")
+        except Exception:
+            ex = True
         finally:
             sock1.close()
             sock2.close()
@@ -81,7 +84,9 @@ class MyTestCase(unittest.TestCase):
             sel2.close()
             if server:
                 server.terminate()
-            raise RuntimeError("Exception was thrown")
+
+        self.assertFalse(ex)
+        self.assertEqual(resp, b"data")
 
 
 if __name__ == '__main__':

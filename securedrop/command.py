@@ -84,7 +84,7 @@ class Command:
         self.sock.setblocking(False)
         self.sock.connect_ex(self.address)
         self.sel.register(self.sock, self.events)
-        print("connected to", self.address)
+        print("client connected to", self.address)
 
     def select_until_complete(self, sentinel):
         while not self.conversation.fully_received and not sentinel():
@@ -93,6 +93,7 @@ class Command:
                     self.service(mask)
 
         self.response = self.conversation.inbound_packets.get_message()
+        return self.response
 
     def service(self, mask):
         if mask & selectors.EVENT_READ:
@@ -103,7 +104,7 @@ class Command:
                 self.conversation.inbound_packets.packets.append(packet)
                 self.conversation.fully_received = packet.is_last
                 if self.conversation.fully_received:
-                    print("closing connection")
+                    print("client closing connection")
                     self.sel.unregister(self.sock)
                     self.sock.close()  # TODO: figure out if we should close here
         if mask & selectors.EVENT_WRITE:
@@ -128,7 +129,7 @@ class CommandReceiver:
         self.sock.listen()
         self.sock.setblocking(False)
         self.sel.register(self.sock, selectors.EVENT_READ, data=None)
-        print("listening on", self.address)
+        print("server listening on", self.address)
 
     def select_until_complete(self, sentinel):
         while not sentinel():
@@ -137,7 +138,7 @@ class CommandReceiver:
                 if key.data is None:
                     sock = key.fileobj
                     conn, addr = sock.accept()
-                    print("accepted connection from", addr)
+                    print("server accepted connection from", addr)
                     conn.setblocking(False)
                     self.sel.register(conn, self.events, data=ConversationData())
                 else:
@@ -164,7 +165,7 @@ class CommandReceiver:
                 sock.send(bytes(out_packet))
                 print("server sending", bytes(out_packet))
         if conversation.is_complete():
-            print("closing connection")
+            print("server closing connection")
             self.sel.unregister(sock)
             sock.close()
 
