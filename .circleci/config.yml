@@ -13,4 +13,4 @@ jobs:
       - run:
           name: Unit Test
           command: |
-            PYTHONPATH=$PYTHONPATH:. python securedrop/tests/registration_test.py
+            PYTHONPATH=$PYTHONPATH:. python securedrop/tests/client_test.py
