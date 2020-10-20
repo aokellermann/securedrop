@@ -94,7 +94,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(resp[0], b"data")
 
     def test_command_echo_concurrent(self):
-        clients = 5
+        clients = 500
         client_sels = [selectors.DefaultSelector() for _ in range(clients)]
         server_sel = selectors.DefaultSelector()
         client_socks = [socket.socket(socket.AF_INET, socket.SOCK_STREAM) for _ in range(clients)]
@@ -106,7 +106,7 @@ class MyTestCase(unittest.TestCase):
                                 b"echo",
                                 b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
         recv = EchoServer(hostname, port, server_sock, server_sel)
-        timer = Timer(5).start()
+        timer = Timer(10).start()
         manager = Manager()
         resps = manager.dict()
         server = None
