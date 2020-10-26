@@ -1,6 +1,5 @@
 import unittest
 import selectors
-import threading
 import time
 import socket
 from multiprocessing import Process
@@ -10,6 +9,12 @@ import securedrop.command as command
 
 hostname = ''
 port = 6969
+
+
+def make_sock():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    return sock
 
 
 class Timer:
@@ -63,10 +68,7 @@ class MyTestCase(unittest.TestCase):
     def test_command_echo(self):
         client_sel = selectors.DefaultSelector()
         server_sel = selectors.DefaultSelector()
-        client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        client_sock, server_sock = make_sock(), make_sock()
         cmd = command.Command(hostname, port, client_sock, client_sel, selectors.EVENT_READ | selectors.EVENT_WRITE,
                               b"echo",
                               b"data")
@@ -97,10 +99,7 @@ class MyTestCase(unittest.TestCase):
         clients = 500
         client_sels = [selectors.DefaultSelector() for _ in range(clients)]
         server_sel = selectors.DefaultSelector()
-        client_socks = [socket.socket(socket.AF_INET, socket.SOCK_STREAM) for _ in range(clients)]
-        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        [client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) for client_sock in client_socks]
-        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        client_socks, server_sock = [make_sock() for _ in range(clients)], make_sock()
         cmds = [command.Command(hostname, port, client_socks[i], client_sels[i],
                                 selectors.EVENT_READ | selectors.EVENT_WRITE,
                                 b"echo",
