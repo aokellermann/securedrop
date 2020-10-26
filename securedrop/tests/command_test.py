@@ -58,7 +58,7 @@ class MyTestCase(unittest.TestCase):
         self.assertFalse(cmd.conversation.is_complete())
 
     def test_command_multiple_packets(self):
-        msg = b"a" * int(command.PacketMessageSize * 12.5) + b"b" * int(command.PacketMessageSize * 23)
+        msg = b"a" * int(command.PACKET_MESSAGE_SIZE * 12.5) + b"b" * int(command.PACKET_MESSAGE_SIZE * 23)
         cmd = command.Command(hostname, port, None, None, selectors.EVENT_WRITE, b"name", msg)
         self.assertEqual(msg, cmd.conversation.outbound_packets.get_message())
         for i in range(36):
