@@ -125,15 +125,15 @@ class TestRegistration(unittest.TestCase):
                     with self.assertRaises(RuntimeError):
                         client.main()
 
-    # def test_aai_login_correct_password(self):
-    #     """Ensures that client logs in successfully with correct email/password."""
-    #     client = Client(sd_filename)
-    #     se1 = InputSideEffect(["email_v", "exit"])
-    #     se2 = InputSideEffect(["password_v"])
-    #     with patch('builtins.input', side_effect=se1.se):
-    #         with patch('getpass.getpass', side_effect=se2.se):
-    #             client.login()
-    #
+    def test_aai_login_correct_password(self):
+        """Ensures that client logs in successfully with correct email/password."""
+        with server_process():
+            se1 = InputSideEffect(["email_v", "exit"])
+            se2 = InputSideEffect(["password_v"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    client.main()
+
     # def test_aaj_add_contact_empty_input(self):
     #     """Ensures that client does not add a new contact if the input is an empty string."""
     #     client = Client(sd_filename)
