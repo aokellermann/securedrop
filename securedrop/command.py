@@ -65,13 +65,14 @@ class ConversationData:
 
 
 class Command:
-    def __init__(self, host: str, port: int, sock, sel, events, name: bytes, message: bytes):
+    def __init__(self, host: str, port: int, sock, sel, events, name: bytes = None, message: bytes = None,
+                 packets: Packets = None):
         self.sock = sock
         self.address = (host, port)
         self.sel = sel
         self.events = events
         self.conversation = ConversationData()
-        self.conversation.outbound_packets = Packets(name=name, message=message)
+        self.conversation.outbound_packets = Packets(name=name, message=message) if name and message else packets
 
     def run(self, sentinel, return_obj, return_obj_key):
         self.setup()

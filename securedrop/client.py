@@ -1,86 +1,34 @@
+#!/usr/bin/env python3
+
 import json
 import getpass
 import os
-import hashlib
-import base64
+import selectors
 
+import securedrop.command as command
+import securedrop.register_packets as register_packets
+import securedrop.status_packets as status_packets
+import securedrop.utils as utils
 
-def make_salt():
-    return os.urandom(32)
-
-
-class Authentication:
-    salt: bytes
-    key: bytes
-
-    def __init__(self, key=None, salt=None, jdict=None):
-        if key is None and jdict is None:
-            raise RuntimeError("Either a key or a jdict must be provided")
-
-        if salt is None:
-            salt = os.urandom(32)
-
-        if jdict is not None:
-            salt, key = base64.b64decode(jdict["salt"]), base64.b64decode(jdict["key"])
-        elif key is not None:
-            key = hashlib.pbkdf2_hmac('sha512', key.encode('utf-8'), salt, 10000)
-
-        self.salt, self.key = salt, key
-
-    def __eq__(self, other):
-        return self.salt == other.salt and self.key == other.key
-
-    def make_dict(self):
-        return {
-            "salt": base64.b64encode(self.salt).decode('ascii'),
-            "key": base64.b64encode(self.key).decode('ascii')
-        }
-
-
-class ClientData:
-    # todo: encrypt name and contacts
-    name: str
-    email: str
-    contacts: dict
-    auth: Authentication
-
-    def __init__(self, nm=None, em=None, cs=None, password=None, jdict=None):
-        if jdict is not None:
-            self.name, self.email, self.contacts, self.auth = \
-                jdict["name"], jdict["email"], jdict["contacts"], Authentication(jdict=jdict["auth"])
-        else:
-            self.name, self.email, self.contacts, self.auth = nm, em, cs, Authentication(password)
-
-    def __eq__(self, other):
-        return self.name == other.name
-
-    def make_dict(self):
-        return {
-            "name": self.name,
-            "email": self.email,
-            "contacts": self.contacts,
-            "auth": self.auth.make_dict()
-        }
+sd_filename = 'client.json'
+hostname = ''
+port = 6969
 
 
 class RegisteredUsers:
-    users = dict()
-    filename: str
+    def __init__(self, host: str, prt: int, sock, sel, filename):
+        self.host, self.port, self.sock, self.sel, self.filename = host, prt, sock, sel, filename
+        self.users = set()
+        if os.path.exists(self.filename):
+            with open(self.filename, 'r') as f:
+                self.users = set(json.load(f))
 
-    def __init__(self, filename):
-        self.filename = filename
-        if os.path.exists(filename):
-            with open(filename, 'r') as f:
-                jdict = json.load(f)
-                for email, cd in jdict.items():
-                    self.users[email] = ClientData(jdict=cd)
-
-    def make_dict(self):
-        return {email: data.make_dict() for email, data in self.users.items()}
+    def make_json(self):
+        return list(self.users)
 
     def write_json(self):
         with open(self.filename, 'w') as f:
-            json.dump(self.make_dict(), f)
+            json.dump(self.make_json(), f)
 
     def register_new_user(self):
         name = input("Enter Full Name: ")
@@ -90,18 +38,25 @@ class RegisteredUsers:
 
         pw1 = getpass.getpass(prompt="Enter Password: ")
         pw2 = getpass.getpass(prompt="Re-enter password: ")
-        if name and email and pw1 and pw2:
-            salt = make_salt()
-            auth1 = Authentication(str(pw1), salt)
-            auth2 = Authentication(str(pw2), salt)
-            if auth1 != auth2:
-                raise RuntimeError("The two entered passwords don't match!")
+        if pw1 != pw2:
+            raise RuntimeError("The two entered passwords don't match!")
 
-            print("Passwords Match.")
-            self.users[email] = ClientData(name, email, {}, pw1)
-            self.write_json()
-            print("User Registered.")
-            return self.users[email]
+        if name and email and pw1 and pw2:
+            cmd = command.Command(self.host, self.port, self.sock, self.sel,
+                                  selectors.EVENT_READ | selectors.EVENT_WRITE,
+                                  packets=register_packets.RegisterPackets(bytes(name), bytes(email), bytes(pw1)))
+            timer = utils.Timer(5).start()
+            resp = [None]
+            cmd.run(timer.is_triggered, resp, 0)
+            status = status_packets.StatusPackets(data=resp[0])
+            if status.ok:
+                self.users.add(email)
+                self.write_json()
+                print("User registered.")
+                return email
+            else:
+                print("Failed to register user: " + str(status.message))
+                return None
         else:
             raise RuntimeError("Invalid input")
 
@@ -109,15 +64,24 @@ class RegisteredUsers:
 class Client:
     users: RegisteredUsers
 
-    def __init__(self, filename):
+    def __init__(self, host: str, prt: int, sock, sel, filename):
         try:
-            self.users = RegisteredUsers(filename)
+            self.users = RegisteredUsers(host, prt, sock, sel, filename)
+        except Exception as e:
+            print("Exiting SecureDrop")
+            raise e
+
+    def run(self):
+        try:
             if not self.users.users:
                 decision = input(
                     "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
                 if str(decision) == 'y':
-                    user = self.users.register_new_user()
-                    self.login(user)
+                    ok = self.users.register_new_user()
+                    if ok:
+                        self.login()
+                    else:
+                        raise RuntimeError("Registration failed.")
                 else:
                     raise RuntimeError("You must register a user before using securedrop")
 
@@ -125,48 +89,49 @@ class Client:
             print("Exiting SecureDrop")
             raise e
 
-    def login(self, user=None):
+    def login(self):
         try:
-            if not user:
-                email = input("Enter Email Address: ")
-                pw = getpass.getpass(prompt="Enter Password: ")
-
-                if email not in self.users.users:
-                    raise RuntimeError("That email address is not registered")
-
-                user = self.users.users[email]
-                auth = Authentication(str(pw), user.auth.salt)
-                if auth != self.users.users[email].auth:
-                    raise RuntimeError("Email and Password Combination Invalid.")
-
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
 
             while True:
-                command = input("secure_drop> ")
-                if command == "help":
+                cmd = input("secure_drop> ")
+                if cmd == "help":
                     print("\"add\"  \t-> Add a new contact")
                     print("\"list\"  \t-> List all online contacts")
                     print("\"send\"  \t-> Transfer file to contact")
                     print("\"exit\"  \t-> Exit SecureDrop")
-                elif command == "add":
-                    name = input("Enter Full Name: ")
-                    email = input("Enter Email Address: ")
-                    if name and email:
-                        user.contacts[email] = name
-                        self.users.write_json()
-                    else:
-                        print("Name and email must both be non-empty.")
+                elif cmd == "add":
+                    # name = input("Enter Full Name: ")
+                    # email = input("Enter Email Address: ")
+                    # if name and email:
+                    #     user.contacts[email] = name
+                    #     self.users.write_json()
+                    # else:
+                    #     print("Name and email must both be non-empty.")
                     pass
-                elif command == "list":
+                elif cmd == "list":
                     pass
-                elif command == "send":
+                elif cmd == "send":
                     pass
-                elif command == "exit":
+                elif cmd == "exit":
                     break
 
         except Exception as e:
             print("Exiting SecureDrop")
             raise e
-        else:
-            print("Exiting SecureDrop")
+
+
+def main():
+    client_sel = selectors.DefaultSelector()
+    client_sock = utils.make_sock()
+    try:
+        client = Client(hostname, port, client_sock, client_sel, sd_filename)
+        client.run()
+    finally:
+        client_sel.close()
+        client_sock.close()
+
+
+if __name__ == "__main__":
+    main()
