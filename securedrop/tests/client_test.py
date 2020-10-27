@@ -105,26 +105,26 @@ class TestRegistration(unittest.TestCase):
         serv = server.Server("", 0, None, None, server.sd_filename)
         self.assert_initial_registered_users_is_valid(serv.users.users)
 
-    # def test_aag_login_unknown_email(self):
-    #     """Ensures that client throws if trying to login with an invalid email."""
-    #     client = Client(sd_filename)
-    #     se1 = InputSideEffect(["email_v_"])
-    #     se2 = InputSideEffect(["password_v"])
-    #     with patch('builtins.input', side_effect=se1.se):
-    #         with patch('getpass.getpass', side_effect=se2.se):
-    #             with self.assertRaises(RuntimeError):
-    #                 client.login()
-    #
-    # def test_aah_login_wrong_password(self):
-    #     """Ensures that client throws if trying to login with an invalid password."""
-    #     client = Client(sd_filename)
-    #     se1 = InputSideEffect(["email_v"])
-    #     se2 = InputSideEffect(["password_v_"])
-    #     with patch('builtins.input', side_effect=se1.se):
-    #         with patch('getpass.getpass', side_effect=se2.se):
-    #             with self.assertRaises(RuntimeError):
-    #                 client.login()
-    #
+    def test_aag_login_unknown_email(self):
+        """Ensures that client throws if trying to login with an invalid email."""
+        with server_process():
+            se1 = InputSideEffect(["email_v_"])
+            se2 = InputSideEffect(["password_v"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    with self.assertRaises(RuntimeError):
+                        client.main()
+
+    def test_aah_login_wrong_password(self):
+        """Ensures that client throws if trying to login with an invalid password."""
+        with server_process():
+            se1 = InputSideEffect(["email_v"])
+            se2 = InputSideEffect(["password_v_"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    with self.assertRaises(RuntimeError):
+                        client.main()
+
     # def test_aai_login_correct_password(self):
     #     """Ensures that client logs in successfully with correct email/password."""
     #     client = Client(sd_filename)

@@ -9,6 +9,7 @@ import json
 import securedrop.command as command
 import securedrop.register_packets as register_command
 import securedrop.status_packets as status_packets
+import securedrop.login_packets as login_packets
 import securedrop.utils as utils
 
 sd_filename = 'server.json'
@@ -101,6 +102,15 @@ class RegisteredUsers:
         print("User Registered.")
         return None
 
+    def login(self, email, password):
+        if email not in self.users:
+            print("That user doesn't exist.")
+            return "That user doesn't exist."
+        if Authentication(key=password, salt=self.users[email].auth.salt) != self.users[email].auth:
+            print("Wrong password.")
+            return "Wrong password."
+        return None
+
 
 class Server(command.CommandReceiver):
     def __init__(self, host: str, prt: int, sock, sel, filename):
@@ -114,14 +124,26 @@ class Server(command.CommandReceiver):
             if msg_type is not None:
                 if msg_type == register_command.REGISTER_PACKETS_NAME:
                     self.process_register(conversation)
+                elif msg_type == login_packets.LOGIN_PACKETS_NAME:
+                    self.process_login(conversation)
 
     def process_register(self, conversation):
         reg = register_command.RegisterPackets(data=conversation.inbound_packets.get_message())
         msg = self.users.register_new_user(reg.name, reg.email, reg.password)
         ok = msg is None
+        print("ok: ", ok, " msg: ", msg)
         conversation.outbound_packets = status_packets.StatusPackets(status=ok, message=msg)
         if ok:
             self.online_users.add(reg.email)
+
+    def process_login(self, conversation):
+        log = login_packets.LoginPackets(data=conversation.inbound_packets.get_message())
+        msg = self.users.login(log.email, log.password)
+        ok = msg is None
+        print("ok: ", ok, " msg: ", msg)
+        conversation.outbound_packets = status_packets.StatusPackets(status=ok, message=msg)
+        if ok:
+            self.online_users.add(log.email)
 
 
 def main():

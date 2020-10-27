@@ -8,6 +8,7 @@ import selectors
 import securedrop.command as command
 import securedrop.register_packets as register_packets
 import securedrop.status_packets as status_packets
+import securedrop.login_packets as login_packets
 import securedrop.utils as utils
 
 sd_filename = 'client.json'
@@ -60,6 +61,23 @@ class RegisteredUsers:
         else:
             raise RuntimeError("Invalid input")
 
+    def login(self):
+        email = input("Enter Email Address: ")
+        password = getpass.getpass(prompt="Enter Password: ")
+        cmd = command.Command(self.host, self.port, self.sock, self.sel,
+                              selectors.EVENT_READ | selectors.EVENT_WRITE,
+                              packets=login_packets.LoginPackets(email, password))
+        timer = utils.Timer(5).start()
+        resp = [None]
+        cmd.run(timer.is_triggered, resp, 0)
+        status = status_packets.StatusPackets(data=resp[0])
+        if status.ok:
+            print("User logged in.")
+            return email
+        else:
+            print("Failed to log in: " + str(status.message))
+            return None
+
 
 class Client:
     users: RegisteredUsers
@@ -67,6 +85,7 @@ class Client:
     def __init__(self, host: str, prt: int, sock, sel, filename):
         try:
             self.users = RegisteredUsers(host, prt, sock, sel, filename)
+            self.user = None
         except Exception as e:
             print("Exiting SecureDrop")
             raise e
@@ -77,14 +96,19 @@ class Client:
                 decision = input(
                     "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
                 if str(decision) == 'y':
-                    ok = self.users.register_new_user()
-                    if ok:
+                    self.user = self.users.register_new_user()
+                    if self.user:
                         self.login()
                     else:
                         raise RuntimeError("Registration failed.")
                 else:
                     raise RuntimeError("You must register a user before using securedrop")
-
+            else:
+                self.user = self.users.login()
+                if self.user:
+                    self.login()
+                else:
+                    raise RuntimeError("Login failed.")
         except Exception as e:
             print("Exiting SecureDrop")
             raise e

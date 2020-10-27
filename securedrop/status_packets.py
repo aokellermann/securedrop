@@ -9,10 +9,10 @@ class StatusPackets(command.Packets):
     def __init__(self, status=None, message=None, data=None):
         self.ok, self.message = status, message
         jdict = dict()
-        if data:
+        if data is not None:
             jdict = json.loads(data)
             self.ok, self.message = jdict["ok"], jdict["message"]
-        elif status:
+        elif status is not None:
             jdict = {
                 "ok": self.ok,
                 "message": self.message,
