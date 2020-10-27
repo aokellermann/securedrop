@@ -17,4 +17,4 @@ class StatusPackets(command.Packets):
                 "ok": self.ok,
                 "message": self.message,
             }
-        super().__init__(name=STATUS_PACKETS_NAME, message=bytes(json.dumps(jdict)))
+        super().__init__(name=STATUS_PACKETS_NAME, message=bytes(json.dumps(jdict), encoding='ascii'))

@@ -6,7 +6,7 @@ REGISTER_PACKETS_NAME = b"RGTR"
 
 
 class RegisterPackets(command.Packets):
-    def __init__(self, name=None, email=None, password=None, data=None):
+    def __init__(self, name: str = None, email: str = None, password: str = None, data=None):
         self.name, self.email, self.password = name, email, password
         jdict = dict()
         if data:
@@ -18,4 +18,4 @@ class RegisterPackets(command.Packets):
                 "email": self.email,
                 "password": self.password,
             }
-        super().__init__(name=REGISTER_PACKETS_NAME, message=bytes(json.dumps(jdict)))
+        super().__init__(name=REGISTER_PACKETS_NAME, message=bytes(json.dumps(jdict), encoding='ascii'))

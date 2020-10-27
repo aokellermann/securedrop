@@ -5,6 +5,10 @@ import securedrop.client as client
 import securedrop.server as server
 import os
 import json
+import time
+import contextlib
+
+from multiprocessing import Process
 
 
 class InputSideEffect:
@@ -18,6 +22,17 @@ class InputSideEffect:
         val = self.lt[self.i]
         self.i += 1
         return val
+
+
+@contextlib.contextmanager
+def server_process():
+    process = Process(target=server.main)
+    try:
+        process.start()
+        time.sleep(1)
+        yield process
+    finally:
+        process.terminate()
 
 
 class TestRegistration(unittest.TestCase):
@@ -53,14 +68,15 @@ class TestRegistration(unittest.TestCase):
                         with self.assertRaises(RuntimeError):
                             client.main()
 
-    # def test_aad_initial_registration_succeeds(self):
-    #     """Ensures that client doesn't throw during valid registration."""
-    #     se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
-    #     se2 = InputSideEffect(["password_v", "password_v"])
-    #     with patch('builtins.input', side_effect=se1.se):
-    #         with patch('getpass.getpass', side_effect=se2.se):
-    #             Client(sd_filename)
-    #
+    def test_aad_initial_registration_succeeds(self):
+        """Ensures that client doesn't throw during valid registration."""
+        with server_process():
+            se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
+            se2 = InputSideEffect(["password_v", "password_v"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    client.main()
+
     # def assert_initial_registered_users_dict_is_valid(self, d):
     #     for email, cd in d.items():
     #         self.assertEqual(email, "email_v")

@@ -48,7 +48,7 @@ class Packets:
                             for i in range(0, len(message), PACKET_MESSAGE_SIZE)]
 
     def get_type(self):
-        return self.packets[0] if len(self.packets) != 0 else None
+        return self.packets[0].header.name if len(self.packets) != 0 else None
 
     def get_message(self):
         return b''.join([packet.message for packet in self.packets])

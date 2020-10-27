@@ -44,7 +44,7 @@ class RegisteredUsers:
         if name and email and pw1 and pw2:
             cmd = command.Command(self.host, self.port, self.sock, self.sel,
                                   selectors.EVENT_READ | selectors.EVENT_WRITE,
-                                  packets=register_packets.RegisterPackets(bytes(name), bytes(email), bytes(pw1)))
+                                  packets=register_packets.RegisterPackets(name, email, pw1))
             timer = utils.Timer(5).start()
             resp = [None]
             cmd.run(timer.is_triggered, resp, 0)
