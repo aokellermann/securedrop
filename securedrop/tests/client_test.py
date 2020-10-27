@@ -3,7 +3,6 @@ from unittest.mock import patch
 
 import securedrop.client as client
 import securedrop.server as server
-import os
 import json
 import time
 import contextlib
@@ -77,35 +76,35 @@ class TestRegistration(unittest.TestCase):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
 
-    # def assert_initial_registered_users_dict_is_valid(self, d):
-    #     for email, cd in d.items():
-    #         self.assertEqual(email, "email_v")
-    #         self.assertEqual(cd["email"], email)
-    #         self.assertEqual(cd["name"], "name_v")
-    #         self.assertTrue(not cd["contacts"])
-    #         self.assertTrue(cd["auth"]["salt"])
-    #         self.assertTrue(cd["auth"]["key"])
-    #
-    # def assert_initial_registered_users_is_valid(self, ru):
-    #     for email, cd in ru.items():
-    #         self.assertEqual(email, "email_v")
-    #         self.assertEqual(cd.email, email)
-    #         self.assertEqual(cd.name, "name_v")
-    #         self.assertTrue(not cd.contacts)
-    #         self.assertTrue(cd.auth.salt)
-    #         self.assertTrue(cd.auth.key)
-    #
-    # def test_aae_initial_json_valid(self):
-    #     """Ensures that client serializes to JSON correctly after registration."""
-    #     with open(sd_filename, 'r') as f:
-    #         jdict = json.load(f)
-    #         self.assert_initial_registered_users_dict_is_valid(jdict)
-    #
-    # def test_aaf_initial_load_from_json(self):
-    #     """Ensures that client deserializes from JSON correctly."""
-    #     client = Client(sd_filename)
-    #     self.assert_initial_registered_users_is_valid(client.users.users)
-    #
+    def assert_initial_registered_users_dict_is_valid(self, d):
+        for email, cd in d.items():
+            self.assertEqual(email, "email_v")
+            self.assertEqual(cd["email"], email)
+            self.assertEqual(cd["name"], "name_v")
+            self.assertTrue(not cd["contacts"])
+            self.assertTrue(cd["auth"]["salt"])
+            self.assertTrue(cd["auth"]["key"])
+
+    def assert_initial_registered_users_is_valid(self, ru):
+        for email, cd in ru.items():
+            self.assertEqual(email, "email_v")
+            self.assertEqual(cd.email, email)
+            self.assertEqual(cd.name, "name_v")
+            self.assertTrue(not cd.contacts)
+            self.assertTrue(cd.auth.salt)
+            self.assertTrue(cd.auth.key)
+
+    def test_aae_initial_json_valid(self):
+        """Ensures that client serializes to JSON correctly after registration."""
+        with open(server.sd_filename, 'r') as f:
+            jdict = json.load(f)
+            self.assert_initial_registered_users_dict_is_valid(jdict)
+
+    def test_aaf_initial_load_from_json(self):
+        """Ensures that client deserializes from JSON correctly."""
+        serv = server.Server("", 0, None, None, server.sd_filename)
+        self.assert_initial_registered_users_is_valid(serv.users.users)
+
     # def test_aag_login_unknown_email(self):
     #     """Ensures that client throws if trying to login with an invalid email."""
     #     client = Client(sd_filename)
@@ -161,8 +160,4 @@ class TestRegistration(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    if os.path.exists(client.sd_filename):
-        os.remove(client.sd_filename)
-    if os.path.exists(server.sd_filename):
-        os.remove(server.sd_filename)
     unittest.main()
