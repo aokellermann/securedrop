@@ -6,28 +6,10 @@ from multiprocessing import Process
 from multiprocessing import Manager
 
 import securedrop.command as command
+import securedrop.utils as utils
 
 hostname = ''
 port = 6969
-
-
-def make_sock():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    return sock
-
-
-class Timer:
-    def __init__(self, duration):
-        self.duration = duration
-        self.begin = None
-
-    def start(self):
-        self.begin = time.time()
-        return self
-
-    def is_triggered(self):
-        return time.time() - self.begin - self.duration >= 0
 
 
 class EchoServer(command.CommandReceiver):
@@ -68,12 +50,12 @@ class MyTestCase(unittest.TestCase):
     def test_command_echo(self):
         client_sel = selectors.DefaultSelector()
         server_sel = selectors.DefaultSelector()
-        client_sock, server_sock = make_sock(), make_sock()
+        client_sock, server_sock = utils.make_sock(), utils.make_sock()
         cmd = command.Command(hostname, port, client_sock, client_sel, selectors.EVENT_READ | selectors.EVENT_WRITE,
                               b"echo",
                               b"data")
         recv = EchoServer(hostname, port, server_sock, server_sel)
-        timer = Timer(5).start()
+        timer = utils.Timer(5).start()
         server = None
         resp = [None]
         ex = False
@@ -99,13 +81,13 @@ class MyTestCase(unittest.TestCase):
         clients = 500
         client_sels = [selectors.DefaultSelector() for _ in range(clients)]
         server_sel = selectors.DefaultSelector()
-        client_socks, server_sock = [make_sock() for _ in range(clients)], make_sock()
+        client_socks, server_sock = [utils.make_sock() for _ in range(clients)], utils.make_sock()
         cmds = [command.Command(hostname, port, client_socks[i], client_sels[i],
                                 selectors.EVENT_READ | selectors.EVENT_WRITE,
                                 b"echo",
                                 b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
         recv = EchoServer(hostname, port, server_sock, server_sel)
-        timer = Timer(10).start()
+        timer = utils.Timer(10).start()
         manager = Manager()
         resps = manager.dict()
         server = None
