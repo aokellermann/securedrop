@@ -60,6 +60,12 @@ class ConversationData:
         self.is_complete = lambda: self.fully_received and self.fully_sent
         self.lock = Lock()
 
+    def reset(self):
+        self.outbound_packets = Packets()
+        self.inbound_packets = Packets()
+        self.fully_received = False
+        self.fully_sent = False
+
 
 class Command:
     def __init__(self, host: str, port: int, sock, sel, events, name: bytes, message: bytes):
@@ -103,9 +109,8 @@ class Command:
                 self.sock.send(bytes(out_packet))
                 print("client sending", bytes(out_packet))
         if self.conversation.is_complete():
-            print("client closing connection")
-            self.sel.unregister(self.sock)
-            self.sock.close()  # TODO: figure out if we should close here
+            print("client command complete")
+            self.sel.unregister(self.sock) # Unregister, but don't close socket since it may be reused
 
 
 class CommandReceiver:
@@ -160,9 +165,9 @@ class CommandReceiver:
                 sock.send(bytes(out_packet))
                 print("server sending", bytes(out_packet))
         if conversation.is_complete():
-            print("server closing connection")
-            self.sel.unregister(sock)
-            sock.close()
+            print("server conversation complete, resetting")
+            with conversation.lock:  # Reset conversation, but don't unregister or close socket
+                conversation.reset()
 
     def on_packet_received(self, conversation):
         pass
