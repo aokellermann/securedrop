@@ -10,6 +10,7 @@ import securedrop.command as command
 import securedrop.register_packets as register_command
 import securedrop.status_packets as status_packets
 import securedrop.login_packets as login_packets
+import securedrop.add_contact_packets as add_contact_packets
 import securedrop.utils as utils
 
 sd_filename = 'server.json'
@@ -62,6 +63,8 @@ class ClientData:
                 jdict["name"], jdict["email"], jdict["contacts"], Authentication(jdict=jdict["auth"])
         else:
             self.name, self.email, self.contacts, self.auth = name, email, contacts, Authentication(password)
+        if self.contacts is None:
+            self.contacts = dict()
 
     def __eq__(self, other):
         return self.name == other.name
@@ -111,47 +114,72 @@ class RegisteredUsers:
             return "Wrong password."
         return None
 
+    def add_contact(self, email, contact_name, contact_email):
+        if not contact_email or not contact_name:
+            return "Invalid email or contact."
+        self.users[email].contacts[contact_email] = contact_name
+        self.write_json()
+        return None
+
 
 class Server(command.CommandReceiver):
     def __init__(self, host: str, prt: int, sock, sel, filename):
         self.users = RegisteredUsers(filename)
-        self.online_users = set()
+        self.email_to_sock = dict()
+        self.sock_to_email = dict()
         super().__init__(host, prt, sock, sel, selectors.EVENT_READ | selectors.EVENT_WRITE)
 
-    def on_command_received(self, conversation):
+    def on_command_received(self, conversation, sock):
         with conversation.lock:
             msg_type = conversation.inbound_packets.get_type()
             if msg_type is not None:
                 if msg_type == register_command.REGISTER_PACKETS_NAME:
-                    self.process_register(conversation)
+                    self.process_register(conversation, sock)
                 elif msg_type == login_packets.LOGIN_PACKETS_NAME:
-                    self.process_login(conversation)
+                    self.process_login(conversation, sock)
+                elif msg_type == add_contact_packets.ADD_CONTACT_PACKETS_NAME:
+                    self.add_contact(conversation, sock)
 
-    def process_register(self, conversation):
+    def process_register(self, conversation, sock):
         reg = register_command.RegisterPackets(data=conversation.inbound_packets.get_message())
         msg = self.users.register_new_user(reg.name, reg.email, reg.password)
         ok = msg is None
-        print("ok: ", ok, " msg: ", msg)
         conversation.outbound_packets = status_packets.StatusPackets(status=ok, message=msg)
         if ok:
-            self.online_users.add(reg.email)
+            self.email_to_sock[reg.email] = sock
+            self.sock_to_email[sock] = reg.email
 
-    def process_login(self, conversation):
+    def process_login(self, conversation, sock):
         log = login_packets.LoginPackets(data=conversation.inbound_packets.get_message())
         msg = self.users.login(log.email, log.password)
         ok = msg is None
-        print("ok: ", ok, " msg: ", msg)
         conversation.outbound_packets = status_packets.StatusPackets(status=ok, message=msg)
         if ok:
-            self.online_users.add(log.email)
+            self.email_to_sock[log.email] = sock
+            self.sock_to_email[sock] = log.email
+
+    def add_contact(self, conversation, sock):
+        addc = add_contact_packets.AddContactPackets(data=conversation.inbound_packets.get_message())
+        msg = self.users.add_contact(self.sock_to_email[sock], addc.name, addc.email)
+        ok = msg is None
+        conversation.outbound_packets = status_packets.StatusPackets(status=ok, message=msg)
+
+
+server = None
+
+
+def get_state():
+    return server
 
 
 def main():
     server_sel = selectors.DefaultSelector()
     server_sock = utils.make_sock()
-    recv = Server(hostname, port, server_sock, server_sel, sd_filename)
+
+    global server
+    server = Server(hostname, port, server_sock, server_sel, sd_filename)
     try:
-        recv.run(lambda: False)
+        server.run(lambda: False)
     except Exception:
         print("Caught exception. Exiting...")
     finally:

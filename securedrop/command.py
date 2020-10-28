@@ -159,9 +159,9 @@ class CommandReceiver:
                     conversation.inbound_packets.packets.append(packet)
                     conversation.fully_received = packet.is_last
                 if conversation.fully_received:
-                    self.on_command_received(conversation)
+                    self.on_command_received(conversation, sock)
                 else:
-                    self.on_packet_received(conversation)
+                    self.on_packet_received(conversation, sock)
         if mask & selectors.EVENT_WRITE:
             if conversation.outbound_packets.packets:
                 out_packet = conversation.outbound_packets.packets.pop()
@@ -173,8 +173,8 @@ class CommandReceiver:
             with conversation.lock:  # Reset conversation, but don't unregister or close socket
                 conversation.reset()
 
-    def on_packet_received(self, conversation):
+    def on_packet_received(self, conversation, sock):
         pass
 
-    def on_command_received(self, conversation):
+    def on_command_received(self, conversation, sock):
         pass

@@ -1,7 +1,6 @@
 import unittest
 import selectors
 import time
-import socket
 from multiprocessing import Process
 from multiprocessing import Manager
 
@@ -16,7 +15,7 @@ class EchoServer(command.CommandReceiver):
     def __init__(self, host: str, prt: int, sock, sel):
         super().__init__(host, prt, sock, sel, selectors.EVENT_READ | selectors.EVENT_WRITE)
 
-    def on_command_received(self, conversation):
+    def on_command_received(self, conversation, sock):
         with conversation.lock:
             msg = conversation.inbound_packets.get_message()
             packets = command.Packets(name=b"echo", message=msg)
@@ -116,12 +115,12 @@ class MyTestCase(unittest.TestCase):
         num_reuses = 250
         client_sel = selectors.DefaultSelector()
         server_sel = selectors.DefaultSelector()
-        client_sock, server_sock = make_sock(), make_sock()
+        client_sock, server_sock = utils.make_sock(), utils.make_sock()
         cmds = [command.Command(hostname, port, client_sock, client_sel, selectors.EVENT_READ | selectors.EVENT_WRITE,
                                 b"echo",
                                 b"data" + bytes([i])) for i in range(num_reuses)]
         recv = EchoServer(hostname, port, server_sock, server_sel)
-        timer = Timer(5).start()
+        timer = utils.Timer(5).start()
         server = None
         resp = [None] * num_reuses
         ex = False

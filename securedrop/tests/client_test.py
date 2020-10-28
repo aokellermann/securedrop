@@ -134,29 +134,34 @@ class TestRegistration(unittest.TestCase):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
 
-    # def test_aaj_add_contact_empty_input(self):
-    #     """Ensures that client does not add a new contact if the input is an empty string."""
-    #     client = Client(sd_filename)
-    #     for i in range(0, 2):
-    #         se_list = ["email_v", "add", "name_v_2", "email_v_2", "exit"]
-    #         se_list[2 + i] = ""
-    #         se1 = InputSideEffect(se_list)
-    #         se2 = InputSideEffect(["password_v"])
-    #         with patch('builtins.input', side_effect=se1.se):
-    #             with patch('getpass.getpass', side_effect=se2.se):
-    #                 client.login()
-    #                 self.assertTrue("email_v_2" not in client.users.users["email_v"].contacts)
-    #
-    # def test_aak_add_contact(self):
-    #     """Ensures that client adds valid contacts successfully."""
-    #     client = Client(sd_filename)
-    #     se1 = InputSideEffect(["email_v", "add", "name_v_2", "email_v_2", "add", "name_v_3", "email_v_3", "exit"])
-    #     se2 = InputSideEffect(["password_v"])
-    #     with patch('builtins.input', side_effect=se1.se):
-    #         with patch('getpass.getpass', side_effect=se2.se):
-    #             client.login()
-    #             self.assertEqual(client.users.users["email_v"].contacts["email_v_2"], "name_v_2")
-    #             self.assertEqual(client.users.users["email_v"].contacts["email_v_3"], "name_v_3")
+    def test_aaj_add_contact_empty_input(self):
+        """Ensures that client does not add a new contact if the input is an empty string."""
+        with server_process():
+            for i in range(0, 2):
+                se_list = ["email_v", "add", "name_v_2", "email_v_2", "exit"]
+                se_list[2 + i] = ""
+                se1 = InputSideEffect(se_list)
+                se2 = InputSideEffect(["password_v"])
+                with patch('builtins.input', side_effect=se1.se):
+                    with patch('getpass.getpass', side_effect=se2.se):
+                        client.main()
+                        with open(server.sd_filename, 'r') as f:
+                            jdict = json.load(f)
+                            self.assertTrue("email_v_2" not in jdict["email_v"]["contacts"])
+
+    def test_aak_add_contact(self):
+        """Ensures that client adds valid contacts successfully."""
+        with server_process():
+            se1 = InputSideEffect(["email_v", "add", "name_v_2", "email_v_2", "add", "name_v_3", "email_v_3", "exit"])
+            se2 = InputSideEffect(["password_v"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    client.main()
+        with open(server.sd_filename, 'r') as f:
+            jdict = json.load(f)
+            for email, cd in jdict.items():
+                self.assertEqual("name_v_2", cd["contacts"]["email_v_2"])
+                self.assertEqual("name_v_3", cd["contacts"]["email_v_3"])
 
 
 if __name__ == '__main__':

@@ -9,6 +9,7 @@ import securedrop.command as command
 import securedrop.register_packets as register_packets
 import securedrop.status_packets as status_packets
 import securedrop.login_packets as login_packets
+import securedrop.add_contact_packets as add_contact_packets
 import securedrop.utils as utils
 
 sd_filename = 'client.json'
@@ -83,6 +84,7 @@ class Client:
     users: RegisteredUsers
 
     def __init__(self, host: str, prt: int, sock, sel, filename):
+        self.host, self.port, self.sock, self.sel, self.filename = host, prt, sock, sel, filename
         try:
             self.users = RegisteredUsers(host, prt, sock, sel, filename)
             self.user = None
@@ -126,14 +128,7 @@ class Client:
                     print("\"send\"  \t-> Transfer file to contact")
                     print("\"exit\"  \t-> Exit SecureDrop")
                 elif cmd == "add":
-                    # name = input("Enter Full Name: ")
-                    # email = input("Enter Email Address: ")
-                    # if name and email:
-                    #     user.contacts[email] = name
-                    #     self.users.write_json()
-                    # else:
-                    #     print("Name and email must both be non-empty.")
-                    pass
+                    self.add_contact()
                 elif cmd == "list":
                     pass
                 elif cmd == "send":
@@ -144,6 +139,27 @@ class Client:
         except Exception as e:
             print("Exiting SecureDrop")
             raise e
+
+    def add_contact(self):
+        name = input("Enter Full Name: ")
+        email = input("Enter Email Address: ")
+        if not name or not email:
+            print("Invalid input.")
+            return None
+
+        cmd = command.Command(self.host, self.port, self.sock, self.sel,
+                              selectors.EVENT_READ | selectors.EVENT_WRITE,
+                              packets=add_contact_packets.AddContactPackets(name, email))
+        timer = utils.Timer(5).start()
+        resp = [None]
+        cmd.run(timer.is_triggered, resp, 0)
+        status = status_packets.StatusPackets(data=resp[0])
+        if status.ok:
+            print("Contact added.")
+            return email
+        else:
+            print("Contact failed to add: " + str(status.message))
+            return None
 
 
 def main():
