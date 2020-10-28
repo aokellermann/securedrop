@@ -110,7 +110,7 @@ class Command:
                 print("client sending", bytes(out_packet))
         if self.conversation.is_complete():
             print("client command complete")
-            self.sel.unregister(self.sock) # Unregister, but don't close socket since it may be reused
+            self.sel.unregister(self.sock)  # Unregister, but don't close socket since it may be reused
 
 
 class CommandReceiver:

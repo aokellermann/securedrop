@@ -131,7 +131,7 @@ class MyTestCase(unittest.TestCase):
         [self.assertEqual(resps[i], b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
 
     def test_command_echo_reuse_sock(self):
-        num_reuses = 5
+        num_reuses = 250
         client_sel = selectors.DefaultSelector()
         server_sel = selectors.DefaultSelector()
         client_sock, server_sock = make_sock(), make_sock()
