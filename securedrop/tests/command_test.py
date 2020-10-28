@@ -112,6 +112,38 @@ class MyTestCase(unittest.TestCase):
         self.assertFalse(ex)
         [self.assertEqual(resps[i], b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
 
+    def test_command_echo_reuse_sock(self):
+        num_reuses = 250
+        client_sel = selectors.DefaultSelector()
+        server_sel = selectors.DefaultSelector()
+        client_sock, server_sock = make_sock(), make_sock()
+        cmds = [command.Command(hostname, port, client_sock, client_sel, selectors.EVENT_READ | selectors.EVENT_WRITE,
+                                b"echo",
+                                b"data" + bytes([i])) for i in range(num_reuses)]
+        recv = EchoServer(hostname, port, server_sock, server_sel)
+        timer = Timer(5).start()
+        server = None
+        resp = [None] * num_reuses
+        ex = False
+        try:
+            server = Process(target=recv.run, args=(timer.is_triggered,))
+            server.start()
+            time.sleep(1)
+            for i in range(num_reuses):
+                cmds[i].run(timer.is_triggered, resp, i)
+        except Exception:
+            ex = True
+        finally:
+            if server:
+                server.terminate()
+            client_sock.close()
+            server_sock.close()
+            client_sel.close()
+            server_sel.close()
+
+        self.assertFalse(ex)
+        [self.assertEqual(resp[i], b"data" + bytes([i])) for i in range(num_reuses)]
+
 
 if __name__ == '__main__':
     unittest.main()
