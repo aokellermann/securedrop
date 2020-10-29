@@ -1,8 +1,7 @@
 import unittest
 import selectors
 import time
-from multiprocessing import Process
-from multiprocessing import Manager
+from threading import Thread
 
 import securedrop.command as command
 import securedrop.utils as utils
@@ -55,19 +54,22 @@ class MyTestCase(unittest.TestCase):
                               b"data")
         recv = EchoServer(hostname, port, server_sock, server_sel)
         timer = utils.Timer(5).start()
-        server = None
         resp = [None]
         ex = False
+        done = False
+        server = None
         try:
-            server = Process(target=recv.run, args=(timer.is_triggered,))
+            server = Thread(target=recv.run, args=(lambda: timer.is_triggered() or done,))
             server.start()
             time.sleep(1)
             cmd.run(timer.is_triggered, resp, 0)
         except Exception:
             ex = True
         finally:
+            done = True
             if server:
-                server.terminate()
+                server.join()
+            time.sleep(1)
             client_sock.close()
             server_sock.close()
             client_sel.close()
@@ -77,7 +79,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(resp[0], b"data")
 
     def test_command_echo_concurrent(self):
-        clients = 500
+        clients = 100
         client_sels = [selectors.DefaultSelector() for _ in range(clients)]
         server_sel = selectors.DefaultSelector()
         client_socks, server_sock = [utils.make_sock() for _ in range(clients)], utils.make_sock()
@@ -86,23 +88,24 @@ class MyTestCase(unittest.TestCase):
                                 b"echo",
                                 b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
         recv = EchoServer(hostname, port, server_sock, server_sel)
-        timer = utils.Timer(10).start()
-        manager = Manager()
-        resps = manager.dict()
-        server = None
+        timer = utils.Timer(30).start()
+        resps = [None] * clients
         ex = False
+        done = False
+        server = None
         try:
-            server = Process(target=recv.run, args=(timer.is_triggered,))
+            server = Thread(target=recv.run, args=(lambda: timer.is_triggered() or done,))
             server.start()
             time.sleep(1)
-            client_threads = [Process(target=cmds[i].run, args=(timer.is_triggered, resps, i,)) for i in range(clients)]
+            client_threads = [Thread(target=cmds[i].run, args=(timer.is_triggered, resps, i,)) for i in range(clients)]
             [client.start() for client in client_threads]
             [client.join() for client in client_threads]
         except Exception:
             ex = True
         finally:
+            done = True
             if server:
-                server.terminate()
+                server.join()
             [client_sock.close() for client_sock in client_socks]
             server_sock.close()
             [client_sel.close() for client_sel in client_sels]
@@ -121,11 +124,12 @@ class MyTestCase(unittest.TestCase):
                                 b"data" + bytes([i])) for i in range(num_reuses)]
         recv = EchoServer(hostname, port, server_sock, server_sel)
         timer = utils.Timer(5).start()
-        server = None
         resp = [None] * num_reuses
         ex = False
+        done = False
+        server = None
         try:
-            server = Process(target=recv.run, args=(timer.is_triggered,))
+            server = Thread(target=recv.run, args=(lambda: timer.is_triggered() or done,))
             server.start()
             time.sleep(1)
             for i in range(num_reuses):
@@ -133,8 +137,10 @@ class MyTestCase(unittest.TestCase):
         except Exception:
             ex = True
         finally:
+            done = True
             if server:
-                server.terminate()
+                server.join()
+            time.sleep(1)
             client_sock.close()
             server_sock.close()
             client_sel.close()

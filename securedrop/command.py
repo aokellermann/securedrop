@@ -1,5 +1,5 @@
 import selectors
-from multiprocessing import Lock
+from threading import Lock
 
 PACKET_DATA_SIZE = 1024
 PACKET_HEADER_ELEMENT_SIZE = 4
@@ -136,17 +136,23 @@ class CommandReceiver:
         print("server listening on", self.address)
 
     def select_until_complete(self, sentinel):
-        while not sentinel():
-            events = self.sel.select(timeout=1)
-            for key, mask in events:
-                if key.data is None:
-                    sock = key.fileobj
-                    conn, addr = sock.accept()
-                    print("server accepted connection from", addr)
-                    conn.setblocking(False)
-                    self.sel.register(conn, self.events, data=ConversationData())
-                else:
-                    self.service(key, mask)
+        try:
+            while not sentinel():
+                events = self.sel.select(timeout=1)
+                for key, mask in events:
+                    if key.data is None:
+                        sock = key.fileobj
+                        conn, addr = sock.accept()
+                        print("server accepted connection from", addr)
+                        conn.setblocking(False)
+                        self.sel.register(conn, self.events, data=ConversationData())
+                    else:
+                        self.service(key, mask)
+        finally:
+            keys = [key for fd, key in self.sel.get_map().items()]
+            for key in keys:
+                self.sel.unregister(key.fileobj)
+                key.fileobj.close()
 
     def service(self, key, mask):
         sock = key.fileobj

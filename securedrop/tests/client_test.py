@@ -7,7 +7,7 @@ import json
 import time
 import contextlib
 
-from multiprocessing import Process
+from threading import Thread
 
 
 class InputSideEffect:
@@ -25,13 +25,14 @@ class InputSideEffect:
 
 @contextlib.contextmanager
 def server_process():
-    process = Process(target=server.main)
+    sentinel = False
+    process = Thread(target=server.main, args=(lambda: sentinel,))
     try:
         process.start()
         time.sleep(1)
         yield process
     finally:
-        process.terminate()
+        sentinel = True
 
 
 class TestRegistration(unittest.TestCase):

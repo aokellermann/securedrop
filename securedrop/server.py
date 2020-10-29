@@ -129,6 +129,14 @@ class Server(command.CommandReceiver):
         self.sock_to_email = dict()
         super().__init__(host, prt, sock, sel, selectors.EVENT_READ | selectors.EVENT_WRITE)
 
+    def run(self, sentinel):
+        try:
+            super().run(sentinel)
+        finally:
+            for sock, email in self.sock_to_email:
+                self.sel.unregister(sock)
+                sock.close()
+
     def on_command_received(self, conversation, sock):
         with conversation.lock:
             msg_type = conversation.inbound_packets.get_type()
@@ -172,14 +180,14 @@ def get_state():
     return server
 
 
-def main():
+def main(sentinel):
     server_sel = selectors.DefaultSelector()
     server_sock = utils.make_sock()
 
     global server
     server = Server(hostname, port, server_sock, server_sel, sd_filename)
     try:
-        server.run(lambda: False)
+        server.run(sentinel)
     except Exception:
         print("Caught exception. Exiting...")
     finally:
@@ -188,4 +196,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(lambda: False)
