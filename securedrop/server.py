@@ -123,18 +123,17 @@ class RegisteredUsers:
 
 
 class Server(command.CommandReceiver):
-    def __init__(self, host: str, prt: int, sock, sel, filename):
+    def __init__(self, host: str, prt: int, filename):
         self.users = RegisteredUsers(filename)
         self.email_to_sock = dict()
         self.sock_to_email = dict()
-        super().__init__(host, prt, sock, sel, selectors.EVENT_READ | selectors.EVENT_WRITE)
+        super().__init__(host, prt)
 
-    def run(self, sentinel):
+    def run(self):
         try:
-            super().run(sentinel)
+            super().run()
         finally:
             for sock, email in self.sock_to_email:
-                self.sel.unregister(sock)
                 sock.close()
 
     def on_command_received(self, conversation, sock):
@@ -180,20 +179,14 @@ def get_state():
     return server
 
 
-def main(sentinel):
-    server_sel = selectors.DefaultSelector()
-    server_sock = utils.make_sock()
-
+def main():
     global server
-    server = Server(hostname, port, server_sock, server_sel, sd_filename)
+    server = Server(hostname, port, sd_filename)
     try:
-        server.run(sentinel)
+        server.run()
     except Exception:
         print("Caught exception. Exiting...")
-    finally:
-        server_sel.close()
-        server_sock.close()
 
 
 if __name__ == "__main__":
-    main(lambda: False)
+    main()

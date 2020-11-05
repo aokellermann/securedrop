@@ -25,14 +25,14 @@ class InputSideEffect:
 
 @contextlib.contextmanager
 def server_process():
-    sentinel = False
-    process = Thread(target=server.main, args=(lambda: sentinel,))
+    process = Thread(target=server.main)
+    process.daemon = True
     try:
         process.start()
         time.sleep(1)
         yield process
     finally:
-        sentinel = True
+        server.server.shutdown()
 
 
 class TestRegistration(unittest.TestCase):
@@ -103,7 +103,7 @@ class TestRegistration(unittest.TestCase):
 
     def test_aaf_initial_load_from_json(self):
         """Ensures that client deserializes from JSON correctly."""
-        serv = server.Server("", 0, None, None, server.sd_filename)
+        serv = server.Server("", 0, server.sd_filename)
         self.assert_initial_registered_users_is_valid(serv.users.users)
 
     def test_aag_login_unknown_email(self):
