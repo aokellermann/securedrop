@@ -5,10 +5,3 @@ SecureDrop
 SecureDrop
 SecureDrop
 SecureDrop
-US
-MA
-Lowell
-SecureDropClient
-SecureDropClient
-SecureDropClient
-SecureDropClient

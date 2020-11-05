@@ -1,3 +1,5 @@
+import ssl
+
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
@@ -17,12 +19,11 @@ async def write(stream, data: bytes):
 
 
 class ClientBase:
-    def __init__(self, host, port, context=None):
+    def __init__(self, host, port):
         super().__init__()
         self.stream = None
         self.host = host
         self.port = port
-        self.context = context
 
     def run(self, timeout):
         print("Client starting main loop")
@@ -31,7 +32,11 @@ class ClientBase:
 
     async def main(self):
         print("Client starting connection")
-        self.stream = await TCPClient().connect('localhost', self.port, ssl_options=self.context)
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        ssl_ctx.load_verify_locations('server.pem')
+        ssl_ctx.load_cert_chain('server.pem')
+        ssl_ctx.check_hostname = False
+        self.stream = await TCPClient().connect('127.0.0.1', self.port, ssl_options=ssl_ctx)
         print("Client connected")
 
     async def read(self):
@@ -46,7 +51,9 @@ class ClientBase:
 
 class ServerBase(TCPServer):
     def __init__(self):
-        super().__init__()
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain("server.pem")
+        super().__init__(ssl_options=ssl_ctx)
         self.shm = None
 
     def run(self, port, shm_name):
