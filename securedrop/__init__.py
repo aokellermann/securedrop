@@ -1,5 +1,4 @@
-__all__ = ['Client', 'Command', 'CommandReceiver']
+__all__ = ['ClientBase', 'ServerBase']
 
-from securedrop.client import Client
-from securedrop.command import Command
-from securedrop.command import CommandReceiver
+from securedrop.client_server_base import ClientBase
+from securedrop.client_server_base import ServerBase
