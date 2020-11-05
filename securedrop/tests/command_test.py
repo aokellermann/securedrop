@@ -1,3 +1,4 @@
+import traceback
 import unittest
 import selectors
 import time
@@ -11,8 +12,8 @@ port = 6969
 
 
 class EchoServer(command.CommandReceiver):
-    def __init__(self, host: str, prt: int, sock, sel):
-        super().__init__(host, prt, sock, sel, selectors.EVENT_READ | selectors.EVENT_WRITE)
+    def __init__(self, host: str, prt: int):
+        super().__init__(host, prt)
 
     def on_command_received(self, conversation, sock):
         with conversation.lock:
@@ -47,33 +48,28 @@ class MyTestCase(unittest.TestCase):
 
     def test_command_echo(self):
         client_sel = selectors.DefaultSelector()
-        server_sel = selectors.DefaultSelector()
-        client_sock, server_sock = utils.make_sock(), utils.make_sock()
+        client_sock = utils.make_sock()
         cmd = command.Command(hostname, port, client_sock, client_sel, selectors.EVENT_READ | selectors.EVENT_WRITE,
                               b"echo",
                               b"data")
-        recv = EchoServer(hostname, port, server_sock, server_sel)
+        recv = EchoServer(hostname, port)
         timer = utils.Timer(5).start()
         resp = [None]
         ex = False
-        done = False
-        server = None
         try:
-            server = Thread(target=recv.run, args=(lambda: timer.is_triggered() or done,))
+            server = Thread(target=recv.run)
+            server.daemon = True
             server.start()
             time.sleep(1)
             cmd.run(timer.is_triggered, resp, 0)
-        except Exception:
+        except Exception as e:
             ex = True
+            print("Caught exception: ", e)
         finally:
-            done = True
-            if server:
-                server.join()
+            recv.shutdown()
             time.sleep(1)
             client_sock.close()
-            server_sock.close()
             client_sel.close()
-            server_sel.close()
 
         self.assertFalse(ex)
         self.assertEqual(resp[0], b"data")
@@ -81,35 +77,30 @@ class MyTestCase(unittest.TestCase):
     def test_command_echo_concurrent(self):
         clients = 100
         client_sels = [selectors.DefaultSelector() for _ in range(clients)]
-        server_sel = selectors.DefaultSelector()
-        client_socks, server_sock = [utils.make_sock() for _ in range(clients)], utils.make_sock()
+        client_socks = [utils.make_sock() for _ in range(clients)]
         cmds = [command.Command(hostname, port, client_socks[i], client_sels[i],
                                 selectors.EVENT_READ | selectors.EVENT_WRITE,
                                 b"echo",
                                 b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
-        recv = EchoServer(hostname, port, server_sock, server_sel)
+        recv = EchoServer(hostname, port)
         timer = utils.Timer(30).start()
         resps = [None] * clients
         ex = False
-        done = False
-        server = None
         try:
-            server = Thread(target=recv.run, args=(lambda: timer.is_triggered() or done,))
+            server = Thread(target=recv.run)
+            server.daemon = True
             server.start()
             time.sleep(1)
             client_threads = [Thread(target=cmds[i].run, args=(timer.is_triggered, resps, i,)) for i in range(clients)]
             [client.start() for client in client_threads]
             [client.join() for client in client_threads]
-        except Exception:
+        except Exception as e:
             ex = True
+            print("Caught exception: ", e)
         finally:
-            done = True
-            if server:
-                server.join()
+            recv.shutdown()
             [client_sock.close() for client_sock in client_socks]
-            server_sock.close()
             [client_sel.close() for client_sel in client_sels]
-            server_sel.close()
 
         self.assertFalse(ex)
         [self.assertEqual(resps[i], b"data" + i.to_bytes(4, byteorder='little')) for i in range(clients)]
@@ -117,34 +108,30 @@ class MyTestCase(unittest.TestCase):
     def test_command_echo_reuse_sock(self):
         num_reuses = 250
         client_sel = selectors.DefaultSelector()
-        server_sel = selectors.DefaultSelector()
-        client_sock, server_sock = utils.make_sock(), utils.make_sock()
+        client_sock = utils.make_sock()
         cmds = [command.Command(hostname, port, client_sock, client_sel, selectors.EVENT_READ | selectors.EVENT_WRITE,
                                 b"echo",
                                 b"data" + bytes([i])) for i in range(num_reuses)]
-        recv = EchoServer(hostname, port, server_sock, server_sel)
+        recv = EchoServer(hostname, port)
         timer = utils.Timer(5).start()
         resp = [None] * num_reuses
         ex = False
-        done = False
-        server = None
         try:
-            server = Thread(target=recv.run, args=(lambda: timer.is_triggered() or done,))
+            server = Thread(target=recv.run)
+            server.daemon = True
             server.start()
             time.sleep(1)
             for i in range(num_reuses):
                 cmds[i].run(timer.is_triggered, resp, i)
-        except Exception:
+        except Exception as e:
             ex = True
+            print("Caught exception: ", e)
+            print(traceback.print_exc())
         finally:
-            done = True
-            if server:
-                server.join()
+            recv.shutdown()
             time.sleep(1)
             client_sock.close()
-            server_sock.close()
             client_sel.close()
-            server_sel.close()
 
         self.assertFalse(ex)
         [self.assertEqual(resp[i], b"data" + bytes([i])) for i in range(num_reuses)]

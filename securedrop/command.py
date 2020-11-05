@@ -1,5 +1,8 @@
 import selectors
+import socket
+import socketserver
 from threading import Lock
+from typing import Any, Tuple, Callable
 
 PACKET_DATA_SIZE = 1024
 PACKET_HEADER_ELEMENT_SIZE = 4
@@ -97,11 +100,12 @@ class Command:
                     self.service(mask)
 
         return_obj[return_obj_key] = self.conversation.inbound_packets.get_message()
+        if self.sock in self.sel.get_map():
+            self.sel.unregister(self.sock)
 
     def service(self, mask):
         if mask & selectors.EVENT_READ:
-            recv_data = self.sock.recv(PACKET_DATA_SIZE)
-            if recv_data is not None:
+            if recv_data := self.sock.recv(PACKET_DATA_SIZE):
                 print("client received", bytes(recv_data))
                 packet = Packet(data=recv_data)
                 self.conversation.inbound_packets.packets.append(packet)
@@ -117,67 +121,77 @@ class Command:
             self.sel.unregister(self.sock)  # Unregister, but don't close socket since it may be reused
 
 
-class CommandReceiver:
-    def __init__(self, host: str, port: int, sock, sel, events):
-        self.address = (host, port)
-        self.sock = sock
-        self.sel = sel
-        self.events = events
+class Server(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    def __init__(self, server_address: Tuple[str, int],
+                 RequestHandlerClass: Callable[..., socketserver.BaseRequestHandler], this):
+        self.parent = this
+        self.allow_reuse_address = True
+        super().__init__(server_address, RequestHandlerClass)
 
-    def run(self, sentinel):
-        self.setup()
-        return self.select_until_complete(sentinel)
 
-    def setup(self):
-        self.sock.bind(self.address)
-        self.sock.listen()
-        self.sock.setblocking(False)
-        self.sel.register(self.sock, selectors.EVENT_READ, data=None)
-        print("server listening on", self.address)
+class Handler(socketserver.BaseRequestHandler):
+    def __init__(self, request: Any, client_address: Any, server: Server):
+        self.conversation = ConversationData()
+        self.parent = server
+        super().__init__(request, client_address, server)
 
-    def select_until_complete(self, sentinel):
+    def is_socket_closed(self):
+        # https://stackoverflow.com/questions/48024720/python-how-to-check-if-socket-is-still-connected
         try:
-            while not sentinel():
-                events = self.sel.select(timeout=1)
-                for key, mask in events:
-                    if key.data is None:
-                        sock = key.fileobj
-                        conn, addr = sock.accept()
-                        print("server accepted connection from", addr)
-                        conn.setblocking(False)
-                        self.sel.register(conn, self.events, data=ConversationData())
-                    else:
-                        self.service(key, mask)
-        finally:
-            keys = [key for fd, key in self.sel.get_map().items()]
-            for key in keys:
-                self.sel.unregister(key.fileobj)
-                key.fileobj.close()
+            # this will try to read bytes without blocking and also without removing them from buffer (peek only)
+            data = self.request.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+            if len(data) == 0:
+                return True
+        except BlockingIOError:
+            return False  # socket is open and reading from it would block
+        except ConnectionResetError:
+            return True  # socket was closed for some other reason
+        except Exception:
+            return False
+        return False
 
-    def service(self, key, mask):
-        sock = key.fileobj
-        conversation = key.data
-        if mask & selectors.EVENT_READ:
-            if recv_data := sock.recv(PACKET_DATA_SIZE):
+    def handle(self):
+        while not self.is_socket_closed():
+            if recv_data := self.request.recv(PACKET_DATA_SIZE):
                 print("server received", bytes(recv_data))
                 packet = Packet(data=recv_data)
-                with conversation.lock:
-                    conversation.inbound_packets.packets.append(packet)
-                    conversation.fully_received = packet.is_last
-                if conversation.fully_received:
-                    self.on_command_received(conversation, sock)
+                with self.conversation.lock:
+                    self.conversation.inbound_packets.packets.append(packet)
+                    self.conversation.fully_received = packet.is_last
+                if self.conversation.fully_received:
+                    self.parent.parent.on_command_received(self.conversation, self.request)
                 else:
-                    self.on_packet_received(conversation, sock)
-        if mask & selectors.EVENT_WRITE:
-            if conversation.outbound_packets.packets:
-                out_packet = conversation.outbound_packets.packets.pop()
-                conversation.fully_sent = out_packet.is_last
-                sock.send(bytes(out_packet))
+                    self.parent.parent.on_packet_received(self.conversation, self.request)
+            if self.conversation.outbound_packets.packets:
+                out_packet = self.conversation.outbound_packets.packets.pop()
+                self.conversation.fully_sent = out_packet.is_last
+                self.request.send(bytes(out_packet))
                 print("server sending", bytes(out_packet))
-        if conversation.is_complete():
-            print("server conversation complete, resetting")
-            with conversation.lock:  # Reset conversation, but don't unregister or close socket
-                conversation.reset()
+            if self.conversation.is_complete():
+                print("server conversation complete, resetting")
+                with self.conversation.lock:  # Reset conversation, but don't unregister or close socket
+                    self.conversation.reset()
+
+
+class CommandReceiver:
+    def __init__(self, host: str, port: int):
+        self.address = (host, port)
+        self.sock_serv = None
+
+    def run(self):
+        self.setup()
+        return self.select_until_complete()
+
+    def setup(self):
+        self.sock_serv = Server(self.address, Handler, self)
+        print("server listening on", self.address)
+
+    def select_until_complete(self):
+        with self.sock_serv:
+            self.sock_serv.serve_forever()
+
+    def shutdown(self):
+        self.sock_serv.shutdown()
 
     def on_packet_received(self, conversation, sock):
         pass
