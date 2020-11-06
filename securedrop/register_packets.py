@@ -1,21 +1,21 @@
 import json
 
-import securedrop.command as command
-
 REGISTER_PACKETS_NAME = b"RGTR"
 
 
-class RegisterPackets(command.Packets):
+class RegisterPackets:
     def __init__(self, name: str = None, email: str = None, password: str = None, data=None):
         self.name, self.email, self.password = name, email, password
-        jdict = dict()
+        self.jdict = dict()
         if data is not None:
-            jdict = json.loads(data)
-            self.name, self.email, self.password = jdict["name"], jdict["email"], jdict["password"]
+            self.jdict = json.loads(data)
+            self.name, self.email, self.password = self.jdict["name"], self.jdict["email"], self.jdict["password"]
         elif name is not None and email is not None and password is not None:
-            jdict = {
+            self.jdict = {
                 "name": self.name,
                 "email": self.email,
                 "password": self.password,
             }
-        super().__init__(name=REGISTER_PACKETS_NAME, message=bytes(json.dumps(jdict), encoding='ascii'))
+
+    def __bytes__(self):
+        return REGISTER_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')

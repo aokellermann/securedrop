@@ -1,20 +1,20 @@
 import json
 
-import securedrop.command as command
-
 ADD_CONTACT_PACKETS_NAME = b"ADDC"
 
 
-class AddContactPackets(command.Packets):
+class AddContactPackets:
     def __init__(self, name: str = None, email: str = None, data=None):
         self.name, self.email = name, email
-        jdict = dict()
+        self.jdict = dict()
         if data is not None:
-            jdict = json.loads(data)
-            self.name, self.email = jdict["name"], jdict["email"]
+            self.jdict = json.loads(data)
+            self.name, self.email = self.jdict["name"], self.jdict["email"]
         elif email is not None:
-            jdict = {
+            self.jdict = {
                 "name": self.name,
                 "email": self.email,
             }
-        super().__init__(name=ADD_CONTACT_PACKETS_NAME, message=bytes(json.dumps(jdict), encoding='ascii'))
+
+    def __bytes__(self):
+        return ADD_CONTACT_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')

@@ -1,20 +1,20 @@
 import json
 
-import securedrop.command as command
-
 LOGIN_PACKETS_NAME = b"LGIN"
 
 
-class LoginPackets(command.Packets):
+class LoginPackets:
     def __init__(self, email: str = None, password: str = None, data=None):
         self.email, self.password = email, password
-        jdict = dict()
+        self.jdict = dict()
         if data is not None:
-            jdict = json.loads(data)
-            self.email, self.password = jdict["email"], jdict["password"]
+            self.jdict = json.loads(data)
+            self.email, self.password = self.jdict["email"], self.jdict["password"]
         elif email is not None and password is not None:
-            jdict = {
+            self.jdict = {
                 "email": self.email,
                 "password": self.password,
             }
-        super().__init__(name=LOGIN_PACKETS_NAME, message=bytes(json.dumps(jdict), encoding='ascii'))
+
+    def __bytes__(self):
+        return LOGIN_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
