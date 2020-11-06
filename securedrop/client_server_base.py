@@ -25,7 +25,7 @@ class ClientBase:
         self.host = host
         self.port = port
 
-    def run(self, timeout):
+    def run(self, timeout=None):
         print("Client starting main loop")
         IOLoop.current().run_sync(self.main, timeout)
         print("Client exiting main loop")
