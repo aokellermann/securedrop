@@ -11,8 +11,11 @@ jobs:
           name: Install required tools
           command: pacman -Sy --noconfirm base base-devel git python python-json5
       - run:
-          name: Install pycryptodome
-          command: python-pip install pycryptodome
+          name: Install pip
+          command: pacman -S python-pip
+     - run:
+           name: Install pycryptocome
+           command: python-pip install pycryptodome
       - run:
           name: Unit Test
           command: |
