@@ -4,6 +4,9 @@ import os
 import hashlib
 import base64
 
+from Crypto import Random
+from Crypto.Cipher import AES
+
 
 def make_salt():
     return os.urandom(32)
@@ -37,6 +40,33 @@ class Authentication:
         }
 
 
+class AESWrapper(object):
+
+    def __init__(self, key):
+        self.bs = AES.block_size
+        self.key = hashlib.sha256(key.encode()).digest()
+
+    def encrypt(self, raw):
+        raw = self._pad(raw)
+        iv = Random.new().read(AES.block_size)
+        cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        bites = base64.b64encode(iv + cipher.encrypt(raw.encode()))
+        return bites.decode(encoding='ascii')
+
+    def decrypt(self, enc):
+        enc2 = base64.b64decode(enc)
+        iv = enc2[:AES.block_size]
+        cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        return self._unpad(cipher.decrypt(enc2[AES.block_size:])).decode('utf-8')
+
+    def _pad(self, s):
+        return s + (self.bs - len(s) % self.bs) * chr(self.bs - len(s) % self.bs)
+
+    @staticmethod
+    def _unpad(s):
+        return s[:-ord(s[len(s)-1:])]
+
+
 class ClientData:
     # todo: encrypt name and contacts
     name: str
@@ -61,6 +91,21 @@ class ClientData:
             "contacts": self.contacts,
             "auth": self.auth.make_dict()
         }
+
+    def encrypt(self, key):
+        if key is None:
+            raise RuntimeError("Encrypt: A key must be provided")
+        enc = AESWrapper(key)
+        self.name = enc.encrypt(self.name)
+        dump = json.dumps(self.contacts)
+        self.contacts = enc.encrypt(dump)
+
+    def decrypt(self, key):
+        if key is None:
+            raise RuntimeError("Decrypt: A key must be provided")
+        enc = AESWrapper(key)
+        self.name = enc.decrypt(self.name)
+        self.contacts = json.loads(enc.decrypt(self.contacts))
 
 
 class RegisteredUsers:
@@ -99,6 +144,7 @@ class RegisteredUsers:
 
             print("Passwords Match.")
             self.users[email] = ClientData(name, email, {}, pw1)
+            self.users[email].encrypt(pw1)
             self.write_json()
             print("User Registered.")
             return self.users[email]
@@ -138,11 +184,10 @@ class Client:
                 auth = Authentication(str(pw), user.auth.salt)
                 if auth != self.users.users[email].auth:
                     raise RuntimeError("Email and Password Combination Invalid.")
-
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
-
             while True:
+
                 command = input("secure_drop> ")
                 if command == "help":
                     print("\"add\"  \t-> Add a new contact")
@@ -153,7 +198,9 @@ class Client:
                     name = input("Enter Full Name: ")
                     email = input("Enter Email Address: ")
                     if name and email:
+                        user.decrypt(pw)
                         user.contacts[email] = name
+                        user.encrypt(pw)
                         self.users.write_json()
                     else:
                         print("Name and email must both be non-empty.")
@@ -170,3 +217,5 @@ class Client:
             raise e
         else:
             print("Exiting SecureDrop")
+
+
