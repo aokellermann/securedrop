@@ -11,6 +11,9 @@ jobs:
           name: Install required tools
           command: pacman -Sy --noconfirm base base-devel git python python-json5
       - run:
+          name: Install pycryptodome
+          command: pip install pycryptodome
+      - run:
           name: Unit Test
           command: |
             PYTHONPATH=$PYTHONPATH:. python securedrop/tests/client_test.py
