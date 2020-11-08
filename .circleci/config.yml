@@ -13,7 +13,7 @@ jobs:
           name: Install pip
           command: pacman -S --noconfirm python-pip
       - run:
-           name: Install pycryptocome
+           name: Install pycryptodome
            command: pip install pycryptodome
       - run:
           name: Unit Test
