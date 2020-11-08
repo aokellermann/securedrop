@@ -11,7 +11,7 @@ jobs:
           command: pacman -Sy --noconfirm base base-devel git python python-json5
       - run:
           name: Install pip
-          command: pacman -S python-pip
+          command: pacman -S --noconfirm python-pip
       - run:
            name: Install pycryptocome
            command: python-pip install pycryptodome
