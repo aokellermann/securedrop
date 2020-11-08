@@ -83,9 +83,6 @@ class TestRegistration(unittest.TestCase):
         user.email = "email_v_"
         with self.assertRaises(RuntimeError):
             user.decrypt_name_contacts()
-        user.email = ""
-        with self.assertRaises(RuntimeError):
-            user.decrypt_name_contacts()
 
 
 if __name__ == '__main__':
