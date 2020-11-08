@@ -65,19 +65,20 @@ class TestRegistration(unittest.TestCase):
 
     def assert_initial_registered_users_dict_is_valid(self, d):
         for email, cd in d.items():
-            self.assertEqual(email, "email_v")
+            self.assertEqual(email, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
             self.assertEqual(cd["email"], email)
-            self.assertEqual(cd["name"], "name_v")
-            self.assertTrue(not cd["contacts"])
+            self.assertTrue(cd["name"], ["data"])
+            self.assertTrue(cd["name"], ["verify"])
+            self.assertTrue(cd["contacts"]["data"])
+            self.assertTrue(cd["contacts"]["verify"])
             self.assertTrue(cd["auth"]["salt"])
             self.assertTrue(cd["auth"]["key"])
 
     def assert_initial_registered_users_is_valid(self, ru):
         for email, cd in ru.items():
-            self.assertEqual(email, "email_v")
-            self.assertEqual(cd.email, email)
-            self.assertEqual(cd.name, "name_v")
-            self.assertTrue(not cd.contacts)
+            self.assertEqual(email, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
+            self.assertEqual(cd.email_hash, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
+            self.assertEqual(cd.enc_name, {"data": "GsLiRVzmpdUYOdgtZdTAHvawZe+paTtUIelyEqGiKzM=", "verify": "382c9e1c1fe4f8142bc95da8005bed1986a38baed7b54cd31857cca3b1bfe9ce"})
             self.assertTrue(cd.auth.salt)
             self.assertTrue(cd.auth.key)
 
@@ -132,7 +133,7 @@ class TestRegistration(unittest.TestCase):
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.login()
-                    self.assertTrue("email_v_2" not in client.users.users["email_v"].contacts)
+                    self.assertTrue("email_v_2" not in client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts)
 
     def test_aak_add_contact(self):
         """Ensures that client adds valid contacts successfully."""
@@ -142,8 +143,8 @@ class TestRegistration(unittest.TestCase):
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 client.login()
-                self.assertEqual(client.users.users["email_v"].contacts["email_v_2"], "name_v_2")
-                self.assertEqual(client.users.users["email_v"].contacts["email_v_3"], "name_v_3")
+                self.assertEqual(client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts["email_v_2"], "name_v_2")
+                self.assertEqual(client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts["email_v_3"], "name_v_3")
 
 
 if __name__ == '__main__':
