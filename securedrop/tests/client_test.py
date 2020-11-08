@@ -78,7 +78,6 @@ class TestRegistration(unittest.TestCase):
         for email, cd in ru.items():
             self.assertEqual(email, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
             self.assertEqual(cd.email_hash, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
-            self.assertEqual(cd.enc_name, {"data": "GsLiRVzmpdUYOdgtZdTAHvawZe+paTtUIelyEqGiKzM=", "verify": "382c9e1c1fe4f8142bc95da8005bed1986a38baed7b54cd31857cca3b1bfe9ce"})
             self.assertTrue(cd.auth.salt)
             self.assertTrue(cd.auth.key)
 
