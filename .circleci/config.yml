@@ -4,7 +4,6 @@ jobs:
   build:
     docker:
       - image: archlinux
-
     steps:
       - checkout
       - run:
@@ -13,7 +12,7 @@ jobs:
       - run:
           name: Install pip
           command: pacman -S python-pip
-     - run:
+      - run:
            name: Install pycryptocome
            command: python-pip install pycryptodome
       - run:
