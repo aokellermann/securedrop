@@ -20,3 +20,4 @@ jobs:
           command: |
             PYTHONPATH=$PYTHONPATH:. python securedrop/tests/client_test.py
             PYTHONPATH=$PYTHONPATH:. python securedrop/tests/command_test.py
+            PYTHONPATH=$PYTHONPATH:. python securedrop/tests/encrypt_test.py
