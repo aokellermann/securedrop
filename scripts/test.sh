@@ -4,6 +4,7 @@ set -eo pipefail
 
 trap "echo 'Tests failed!'" ERR
 
+cd securedrop/tests
 PYTHONPATH=$PYTHONPATH:../.. python3 client_test.py
 PYTHONPATH=$PYTHONPATH:../.. python3 command_test.py
 
