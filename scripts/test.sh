@@ -3,9 +3,10 @@
 set -eo pipefail
 
 trap "echo 'Tests failed!'" ERR
+trap "rm -f securedrop.json" EXIT
 
-cd securedrop/tests
-PYTHONPATH=$PYTHONPATH:../.. python3 client_test.py
-PYTHONPATH=$PYTHONPATH:../.. python3 command_test.py
+for file in ./securedrop/tests/*_test.py; do
+  PYTHONPATH=$PYTHONPATH:. ./"$file"
+done
 
-echo "All tests passed successfully!"
+echo "Tests succeeded!"

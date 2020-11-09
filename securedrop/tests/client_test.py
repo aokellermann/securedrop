@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import unittest
 from unittest.mock import patch
 
@@ -147,6 +149,4 @@ class TestRegistration(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    if os.path.exists(sd_filename):
-        os.remove(sd_filename)
     unittest.main()
