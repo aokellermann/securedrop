@@ -67,8 +67,8 @@ class TestRegistration(unittest.TestCase):
         for email, cd in d.items():
             self.assertEqual(email, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
             self.assertEqual(cd["email"], email)
-            self.assertTrue(cd["name"], ["data"])
-            self.assertTrue(cd["name"], ["verify"])
+            self.assertTrue(cd["name"]["data"])
+            self.assertTrue(cd["name"]["verify"])
             self.assertTrue(cd["contacts"]["data"])
             self.assertTrue(cd["contacts"]["verify"])
             self.assertTrue(cd["auth"]["salt"])
@@ -142,8 +142,39 @@ class TestRegistration(unittest.TestCase):
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 client.login()
-                self.assertEqual(client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts["email_v_2"], "name_v_2")
-                self.assertEqual(client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts["email_v_3"], "name_v_3")
+                user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+                self.assertEqual(user.contacts["email_v_2"], "name_v_2")
+                self.assertEqual(user.contacts["email_v_3"], "name_v_3")
+
+
+    def test_aal_login_correct_password_decrypt_contact(self):
+        """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
+        client = Client(sd_filename)
+        user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+        user.email = "email_v"
+        self.assertNotEqual(user.enc_contacts, "name_v_3")
+        user.decrypt_name_contacts()
+        self.assertIsNotNone(user.contacts)
+        self.assertEqual(user.contacts["email_v_2"], "name_v_2")
+        self.assertEqual(user.contacts["email_v_3"], "name_v_3")
+
+    def test_aam_data_in_memory_after_decrypt(self):
+        """Ensures that Client data can be accessed in local memory after decryption"""
+        client = Client(sd_filename)
+        user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+        user.email = "email_v"
+        user.decrypt_name_contacts()
+        self.assertEqual(user.name, "Testname")
+        self.assertEqual(user.contacts["email_v_2"], "name_v_2")
+        self.assertEqual(user.contacts["email_v_3"], "name_v_3")
+
+    def test_aan_test_decrypt_wrong_password(self):
+        """Ensures that client throws an error when decryption is not successful (wrong key)."""
+        client = Client(sd_filename)
+        user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+        user.email = "email_v_"
+        with self.assertRaises(RuntimeError):
+            user.decrypt_name_contacts()
 
 
 if __name__ == '__main__':
