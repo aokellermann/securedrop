@@ -164,7 +164,7 @@ class TestRegistration(unittest.TestCase):
         user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
         user.email = "email_v"
         user.decrypt_name_contacts()
-        self.assertEqual(user.name, "Testname")
+        self.assertEqual(user.name, "name_v")
         self.assertEqual(user.contacts["email_v_2"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3"], "name_v_3")
 
