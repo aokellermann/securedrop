@@ -3,13 +3,14 @@ import getpass
 import os
 import hashlib
 import base64
+import Crypto
 
 from Crypto import Random
 from Crypto.Cipher import AES
 
 
 def make_salt():
-    return os.urandom(32)
+    return Crypto.Random.get_random_bytes(32)
 
 
 class Authentication:
@@ -49,10 +50,10 @@ class AESWrapper(object):
     def encrypt(self, raw):
         verify = hashlib.sha256((raw.encode())).hexdigest()
         raw = self._pad(raw)
-        iv = Random.new().read(AES.block_size)
+        iv = Crypto.Random.get_random_bytes(AES.block_size)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        bites = base64.b64encode(iv + cipher.encrypt(raw.encode()))
-        return dict({"data": bites.decode('ascii'), "verify": verify})
+        bytes_ = base64.b64encode(iv + cipher.encrypt(raw.encode()))
+        return dict({"data": bytes_.decode('ascii'), "verify": verify})
 
     def decrypt(self, enc):
         data = enc["data"]
