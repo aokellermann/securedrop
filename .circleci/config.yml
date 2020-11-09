@@ -12,4 +12,4 @@ jobs:
           command: pacman -Sy --noconfirm base base-devel git python python-json5
       - run:
           name: Unit Test
-          command: bash scripts/test.sh
+          command: ./scripts/test.sh
