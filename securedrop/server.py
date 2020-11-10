@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 
-import selectors
 import os
 import base64
 import hashlib
 import json
+from multiprocessing import shared_memory
 
-import securedrop.command as command
-import securedrop.register_packets as register_command
-import securedrop.status_packets as status_packets
-import securedrop.login_packets as login_packets
-import securedrop.add_contact_packets as add_contact_packets
-import securedrop.utils as utils
+from securedrop import ServerBase
+from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
+from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
+from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
+from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 
 sd_filename = 'server.json'
-hostname = ''
 port = 6969
 
 
@@ -103,7 +101,7 @@ class RegisteredUsers:
         self.users[email] = ClientData(name=name, email=email, password=password)
         self.write_json()
         print("User Registered.")
-        return None
+        return ""
 
     def login(self, email, password):
         if email not in self.users:
@@ -112,7 +110,7 @@ class RegisteredUsers:
         if Authentication(key=password, salt=self.users[email].auth.salt) != self.users[email].auth:
             print("Wrong password.")
             return "Wrong password."
-        return None
+        return ""
 
     def add_contact(self, email, contact_name, contact_email):
         if not contact_email or not contact_name:
@@ -122,71 +120,77 @@ class RegisteredUsers:
         return None
 
 
-class Server(command.CommandReceiver):
-    def __init__(self, host: str, prt: int, filename):
+class Server(ServerBase):
+    def __init__(self, filename):
         self.users = RegisteredUsers(filename)
         self.email_to_sock = dict()
         self.sock_to_email = dict()
-        super().__init__(host, prt)
+        super().__init__()
+
+    async def on_data_received(self, data, stream):
+        if len(data) < 4:
+            print("Server sent invalid data")
+            return
+
+        prefix = data[:4]
+        data = data[4:]
+        if prefix == REGISTER_PACKETS_NAME:
+            await self.process_register(RegisterPackets(data=data), stream)
+        elif prefix == LOGIN_PACKETS_NAME:
+            await self.process_login(LoginPackets(data=data), stream)
+        elif prefix == ADD_CONTACT_PACKETS_NAME:
+            await self.add_contact(AddContactPackets(data=data), stream)
+
+    async def write_status(self, stream, msg):
+        await self.write(stream, bytes(StatusPackets(msg)))
+
+    async def process_register(self, reg, stream):
+        msg = self.users.register_new_user(reg.name, reg.email, reg.password)
+        if msg == "":
+            self.email_to_sock[reg.email] = stream
+            self.sock_to_email[stream] = reg.email
+        await self.write_status(stream, msg)
+
+    async def process_login(self, log, stream):
+        msg = self.users.login(log.email, log.password)
+        if msg == "":
+            self.email_to_sock[log.email] = stream
+            self.sock_to_email[stream] = log.email
+        await self.write_status(stream, msg)
+
+    async def add_contact(self, addc, stream):
+        msg = self.users.add_contact(self.sock_to_email[stream], addc.name, addc.email)
+        await self.write_status(stream, msg)
+
+
+class ServerDriver:
+    def __init__(self):
+        self.shm = shared_memory.SharedMemory(create=True, size=1)
+        self.shm.buf[0] = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def shm_name(self):
+        return self.shm.name
 
     def run(self):
         try:
-            super().run()
+            server = Server(sd_filename)
+            server.run(port, self.shm_name())
+        except Exception:
+            print("Caught exception. Exiting...")
         finally:
-            for sock, email in self.sock_to_email:
-                sock.close()
+            self.shm.buf[0] = 1
 
-    def on_command_received(self, conversation, sock):
-        with conversation.lock:
-            msg_type = conversation.inbound_packets.get_type()
-            if msg_type is not None:
-                if msg_type == register_command.REGISTER_PACKETS_NAME:
-                    self.process_register(conversation, sock)
-                elif msg_type == login_packets.LOGIN_PACKETS_NAME:
-                    self.process_login(conversation, sock)
-                elif msg_type == add_contact_packets.ADD_CONTACT_PACKETS_NAME:
-                    self.add_contact(conversation, sock)
-
-    def process_register(self, conversation, sock):
-        reg = register_command.RegisterPackets(data=conversation.inbound_packets.get_message())
-        msg = self.users.register_new_user(reg.name, reg.email, reg.password)
-        ok = msg is None
-        conversation.outbound_packets = status_packets.StatusPackets(status=ok, message=msg)
-        if ok:
-            self.email_to_sock[reg.email] = sock
-            self.sock_to_email[sock] = reg.email
-
-    def process_login(self, conversation, sock):
-        log = login_packets.LoginPackets(data=conversation.inbound_packets.get_message())
-        msg = self.users.login(log.email, log.password)
-        ok = msg is None
-        conversation.outbound_packets = status_packets.StatusPackets(status=ok, message=msg)
-        if ok:
-            self.email_to_sock[log.email] = sock
-            self.sock_to_email[sock] = log.email
-
-    def add_contact(self, conversation, sock):
-        addc = add_contact_packets.AddContactPackets(data=conversation.inbound_packets.get_message())
-        msg = self.users.add_contact(self.sock_to_email[sock], addc.name, addc.email)
-        ok = msg is None
-        conversation.outbound_packets = status_packets.StatusPackets(status=ok, message=msg)
-
-
-server = None
-
-
-def get_state():
-    return server
-
-
-def main():
-    global server
-    server = Server(hostname, port, sd_filename)
-    try:
-        server.run()
-    except Exception:
-        print("Caught exception. Exiting...")
+    def close(self):
+        self.shm.close()
+        self.shm.unlink()
 
 
 if __name__ == "__main__":
-    main()
+    with ServerDriver() as driver:
+        driver.run()

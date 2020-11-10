@@ -3,23 +3,21 @@
 import json
 import getpass
 import os
-import selectors
 
-import securedrop.command as command
-import securedrop.register_packets as register_packets
-import securedrop.status_packets as status_packets
-import securedrop.login_packets as login_packets
-import securedrop.add_contact_packets as add_contact_packets
-import securedrop.utils as utils
+from securedrop.client_server_base import ClientBase
+from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
+from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
+from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
+from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 
 sd_filename = 'client.json'
-hostname = ''
+hostname = '127.0.0.1'
 port = 6969
 
 
 class RegisteredUsers:
-    def __init__(self, host: str, prt: int, sock, sel, filename):
-        self.host, self.port, self.sock, self.sel, self.filename = host, prt, sock, sel, filename
+    def __init__(self, filename):
+        self.filename = filename
         self.users = set()
         if os.path.exists(self.filename):
             with open(self.filename, 'r') as f:
@@ -32,7 +30,7 @@ class RegisteredUsers:
         with open(self.filename, 'w') as f:
             json.dump(self.make_json(), f)
 
-    def register_new_user(self):
+    def register_prompt(self):
         name = input("Enter Full Name: ")
         email = input("Enter Email Address: ")
         if email in self.users:
@@ -43,79 +41,91 @@ class RegisteredUsers:
         if pw1 != pw2:
             raise RuntimeError("The two entered passwords don't match!")
 
-        if name and email and pw1 and pw2:
-            cmd = command.Command(self.host, self.port, self.sock, self.sel,
-                                  selectors.EVENT_READ | selectors.EVENT_WRITE,
-                                  packets=register_packets.RegisterPackets(name, email, pw1))
-            timer = utils.Timer(5).start()
-            resp = [None]
-            cmd.run(timer.is_triggered, resp, 0)
-            status = status_packets.StatusPackets(data=resp[0])
-            if status.ok:
-                self.users.add(email)
-                self.write_json()
-                print("User registered.")
-                return email
-            else:
-                print("Failed to register user: " + str(status.message))
-                return None
-        else:
-            raise RuntimeError("Invalid input")
+        if not name or not email or not pw1:
+            raise RuntimeError("Empty input")
 
-    def login(self):
+        return name, email, pw1
+
+    def register_user(self, email):
+        self.users.add(email)
+        self.write_json()
+        print("User registered.")
+
+    def login_prompt(self):
         email = input("Enter Email Address: ")
         password = getpass.getpass(prompt="Enter Password: ")
-        cmd = command.Command(self.host, self.port, self.sock, self.sel,
-                              selectors.EVENT_READ | selectors.EVENT_WRITE,
-                              packets=login_packets.LoginPackets(email, password))
-        timer = utils.Timer(5).start()
-        resp = [None]
-        cmd.run(timer.is_triggered, resp, 0)
-        status = status_packets.StatusPackets(data=resp[0])
-        if status.ok:
-            print("User logged in.")
-            return email
-        else:
-            print("Failed to log in: " + str(status.message))
-            return None
+        return email, password
 
 
-class Client:
+class Client(ClientBase):
     users: RegisteredUsers
 
-    def __init__(self, host: str, prt: int, sock, sel, filename):
-        self.host, self.port, self.sock, self.sel, self.filename = host, prt, sock, sel, filename
+    def __init__(self, host: str, prt: int, filename):
+        super().__init__(host, prt)
+        self.filename = filename
         try:
-            self.users = RegisteredUsers(host, prt, sock, sel, filename)
+            self.users = RegisteredUsers(filename)
             self.user = None
         except Exception as e:
             print("Exiting SecureDrop")
             raise e
 
-    def run(self):
+    async def main(self):
+        await super().main()
         try:
             if not self.users.users:
                 decision = input(
                     "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
                 if str(decision) == 'y':
-                    self.user = self.users.register_new_user()
+                    self.user = await self.register()
                     if self.user:
-                        self.login()
+                        await self.sh()
                     else:
                         raise RuntimeError("Registration failed.")
                 else:
                     raise RuntimeError("You must register a user before using securedrop")
             else:
-                self.user = self.users.login()
+                self.user = await self.login()
                 if self.user:
-                    self.login()
+                    await self.sh()
                 else:
                     raise RuntimeError("Login failed.")
         except Exception as e:
             print("Exiting SecureDrop")
             raise e
 
-    def login(self):
+    async def register(self):
+        msg, email = None, None
+        try:
+            name, email, pw = self.users.register_prompt()
+            await self.write(bytes(RegisterPackets(name, email, pw)))
+            msg = StatusPackets(data=await self.read()).message
+            if msg != "":
+                raise RuntimeError(msg)
+            self.users.register_user(email)
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to register: ", msg)
+            return None
+        return email
+
+    async def login(self):
+        msg, email = None, None
+        try:
+            email, pw = self.users.login_prompt()
+            await self.write(bytes(LoginPackets(email, pw)))
+            msg = StatusPackets(data=await self.read()).message
+            if msg != "":
+                raise RuntimeError(msg)
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to login: ", msg)
+            return None
+        return email
+
+    async def sh(self):
         try:
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
@@ -128,7 +138,7 @@ class Client:
                     print("\"send\"  \t-> Transfer file to contact")
                     print("\"exit\"  \t-> Exit SecureDrop")
                 elif cmd == "add":
-                    self.add_contact()
+                    await self.add_contact()
                 elif cmd == "list":
                     pass
                 elif cmd == "send":
@@ -140,37 +150,26 @@ class Client:
             print("Exiting SecureDrop")
             raise e
 
-    def add_contact(self):
-        name = input("Enter Full Name: ")
-        email = input("Enter Email Address: ")
-        if not name or not email:
-            print("Invalid input.")
-            return None
+    async def add_contact(self):
+        msg = None
+        try:
+            name = input("Enter Full Name: ")
+            email = input("Enter Email Address: ")
+            if not name or not email:
+                raise RuntimeError("Empty input.")
 
-        cmd = command.Command(self.host, self.port, self.sock, self.sel,
-                              selectors.EVENT_READ | selectors.EVENT_WRITE,
-                              packets=add_contact_packets.AddContactPackets(name, email))
-        timer = utils.Timer(5).start()
-        resp = [None]
-        cmd.run(timer.is_triggered, resp, 0)
-        status = status_packets.StatusPackets(data=resp[0])
-        if status.ok:
-            print("Contact added.")
-            return email
-        else:
-            print("Contact failed to add: " + str(status.message))
-            return None
+            await self.write(bytes(AddContactPackets(name, email)))
+            msg = StatusPackets(data=await self.read()).message
+            if msg != "":
+                raise RuntimeError(msg)
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to add contact: ", msg)
 
 
 def main():
-    client_sel = selectors.DefaultSelector()
-    client_sock = utils.make_sock()
-    try:
-        client = Client(hostname, port, client_sock, client_sel, sd_filename)
-        client.run()
-    finally:
-        client_sel.close()
-        client_sock.close()
+    Client(hostname, port, sd_filename).run()
 
 
 if __name__ == "__main__":

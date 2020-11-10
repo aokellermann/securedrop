@@ -27,8 +27,10 @@ class ClientBase:
 
     def run(self, timeout=None):
         print("Client starting main loop")
-        IOLoop.current().run_sync(self.main, timeout)
-        print("Client exiting main loop")
+        try:
+            IOLoop.current().run_sync(self.main, timeout)
+        finally:
+            print("Client exiting main loop")
 
     async def main(self):
         print("Client starting connection")
@@ -63,10 +65,12 @@ class ServerBase(TCPServer):
         self.start(0)
         print("Server starting main loop")
         PeriodicCallback(self.check_stop, 100).start()
-        IOLoop.current().start()
-        self.shm.close()
-        self.shm = None
-        print("Server exiting main loop")
+        try:
+            IOLoop.current().start()
+        finally:
+            self.shm.close()
+            self.shm = None
+            print("Server exiting main loop")
 
     def check_stop(self):
         if self.shm.buf[0] == 1:
@@ -74,6 +78,7 @@ class ServerBase(TCPServer):
 
     async def handle_stream(self, stream, address):
         print("Server accepted connection")
+        await stream.wait_for_handshake()
         while True:
             try:
                 data = await read(stream)

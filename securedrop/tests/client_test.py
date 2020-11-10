@@ -2,12 +2,12 @@ import unittest
 from unittest.mock import patch
 
 import securedrop.client as client
-import securedrop.server as server
+from securedrop.server import ServerDriver, Server, sd_filename
 import json
 import time
 import contextlib
 
-from threading import Thread
+from multiprocessing import shared_memory, Process
 
 
 class InputSideEffect:
@@ -25,14 +25,17 @@ class InputSideEffect:
 
 @contextlib.contextmanager
 def server_process():
-    process = Thread(target=server.main)
-    process.daemon = True
-    try:
-        process.start()
-        time.sleep(1)
-        yield process
-    finally:
-        server.server.shutdown()
+    with ServerDriver() as driver:
+        process = Process(target=driver.run)
+        try:
+            process.start()
+            time.sleep(0.1)
+            yield process
+        finally:
+            shm = shared_memory.SharedMemory(driver.shm_name())
+            shm.buf[0] = 1
+            shm.close()
+            process.join()
 
 
 class TestRegistration(unittest.TestCase):
@@ -41,10 +44,11 @@ class TestRegistration(unittest.TestCase):
 
     def test_aaa_initial_ask_to_register_no_response_fails(self):
         """Ensures that client throws if the user declines to register a user."""
-        se = InputSideEffect(["n", "exit"])
-        with patch('builtins.input', side_effect=se.se):
-            with self.assertRaises(RuntimeError):
-                client.main()
+        with server_process():
+            se = InputSideEffect(["n", "exit"])
+            with patch('builtins.input', side_effect=se.se):
+                with self.assertRaises(RuntimeError):
+                    client.main()
 
     def test_aab_initial_ask_to_register_mismatching_passwords(self):
         """Ensures that client throws if the user inputs mismatching passwords during registration."""
@@ -97,13 +101,13 @@ class TestRegistration(unittest.TestCase):
 
     def test_aae_initial_json_valid(self):
         """Ensures that client serializes to JSON correctly after registration."""
-        with open(server.sd_filename, 'r') as f:
+        with open(sd_filename, 'r') as f:
             jdict = json.load(f)
             self.assert_initial_registered_users_dict_is_valid(jdict)
 
     def test_aaf_initial_load_from_json(self):
         """Ensures that client deserializes from JSON correctly."""
-        serv = server.Server("", 0, server.sd_filename)
+        serv = Server(sd_filename)
         self.assert_initial_registered_users_is_valid(serv.users.users)
 
     def test_aag_login_unknown_email(self):
@@ -146,7 +150,7 @@ class TestRegistration(unittest.TestCase):
                 with patch('builtins.input', side_effect=se1.se):
                     with patch('getpass.getpass', side_effect=se2.se):
                         client.main()
-                        with open(server.sd_filename, 'r') as f:
+                        with open(sd_filename, 'r') as f:
                             jdict = json.load(f)
                             self.assertTrue("email_v_2" not in jdict["email_v"]["contacts"])
 
@@ -158,7 +162,7 @@ class TestRegistration(unittest.TestCase):
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
-        with open(server.sd_filename, 'r') as f:
+        with open(sd_filename, 'r') as f:
             jdict = json.load(f)
             for email, cd in jdict.items():
                 self.assertEqual("name_v_2", cd["contacts"]["email_v_2"])
