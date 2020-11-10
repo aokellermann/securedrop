@@ -36,8 +36,8 @@ class Authentication:
 
     def make_dict(self):
         return {
-            "salt": base64.b64encode(self.salt).decode('ascii'),
-            "key": base64.b64encode(self.key).decode('ascii')
+            "salt": base64.b64encode(self.salt).decode('utf-8'),
+            "key": base64.b64encode(self.key).decode('utf-8')
         }
 
 
@@ -45,14 +45,14 @@ class AESWrapper(object):
 
     def __init__(self, key):
         self.bs = AES.block_size
-        self.key = Crypto.Util.Padding.pad(key.encode('ascii'), self.bs)
+        self.key = Crypto.Util.Padding.pad(key.encode('utf-8'), self.bs)
 
     def encrypt(self, raw):
-        raw = Crypto.Util.Padding.pad(raw.encode('ascii'), self.bs)
+        raw = Crypto.Util.Padding.pad(raw.encode('utf-8'), self.bs)
         iv = get_random_bytes(AES.block_size)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
         bytes_ = base64.b64encode(iv + cipher.encrypt(raw))
-        return bytes_.decode('ascii')
+        return bytes_.decode('utf-8')
 
     def decrypt(self, enc):
         try:
