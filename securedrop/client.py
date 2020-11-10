@@ -3,14 +3,14 @@ import getpass
 import os
 import hashlib
 import base64
-import Crypto
+import Crypto.Util.Padding
 
-from Crypto import Random
+from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES
 
 
 def make_salt():
-    return Crypto.Random.get_random_bytes(32)
+    return get_random_bytes(32)
 
 
 class Authentication:
@@ -45,34 +45,24 @@ class AESWrapper(object):
 
     def __init__(self, key):
         self.bs = AES.block_size
-        self.key = hashlib.sha256(key.encode()).digest()
+        self.key = Crypto.Util.Padding.pad(key.encode('ascii'), self.bs)
 
     def encrypt(self, raw):
-        verify = hashlib.sha256((raw.encode())).hexdigest()
-        raw = self._pad(raw)
-        iv = Crypto.Random.get_random_bytes(AES.block_size)
+        raw = Crypto.Util.Padding.pad(raw.encode('ascii'), self.bs)
+        iv = get_random_bytes(AES.block_size)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        bytes_ = base64.b64encode(iv + cipher.encrypt(raw.encode()))
-        return dict({"data": bytes_.decode('ascii'), "verify": verify})
+        bytes_ = base64.b64encode(iv + cipher.encrypt(raw))
+        return bytes_.decode('ascii')
 
     def decrypt(self, enc):
-        data = enc["data"]
-        verify = enc["verify"]
-        data = base64.b64decode(data)
-        iv = data[:AES.block_size]
-        cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        result = self._unpad(cipher.decrypt(data[AES.block_size:])).decode('utf-8')
-        if verify == hashlib.sha256((result.encode())).hexdigest():
+        try:
+            data = base64.b64decode(enc)
+            iv = data[:AES.block_size]
+            cipher = AES.new(self.key, AES.MODE_CBC, iv)
+            result = Crypto.Util.Padding.unpad(cipher.decrypt(data[AES.block_size:]), self.bs).decode('utf-8')
             return result
-        else:
-            raise RuntimeError("Decryption was not successful, could not verify input")
-
-    def _pad(self, s):
-        return s + (self.bs - len(s) % self.bs) * chr(self.bs - len(s) % self.bs)
-
-    @staticmethod
-    def _unpad(s):
-        return s[:-ord(s[len(s)-1:])]
+        except ValueError:
+            raise ValueError("Decryption was not successful, could not verify input")
 
 
 class ClientData:
@@ -81,8 +71,8 @@ class ClientData:
     contacts: dict
     auth: Authentication
     email_hash: str
-    enc_name: dict
-    enc_contacts: dict
+    enc_name: str
+    enc_contacts: str
 
     def __init__(self, nm=None, em=None, cs=None, password=None, jdict=None):
         if jdict is not None:
