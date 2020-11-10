@@ -161,20 +161,20 @@ class Client:
     def __init__(self, filename):
         try:
             self.users = RegisteredUsers(filename)
-            if not self.users.users:
-                decision = input(
-                    "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
-                if str(decision) == 'y':
-                    user = self.users.register_new_user()
-                    self.login(user)
-                else:
-                    raise RuntimeError("You must register a user before using securedrop")
-
         except Exception as e:
             print("Exiting SecureDrop")
             raise e
 
-    def login(self, user=None):
+    def login(self):
+        user = None
+        if not self.users.users:
+            decision = input(
+                "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
+            if str(decision) == 'y':
+                user = self.users.register_new_user()
+            else:
+                raise RuntimeError("You must register a user before using securedrop")
+
         try:
             if not user:
                 email = input("Enter Email Address: ")
