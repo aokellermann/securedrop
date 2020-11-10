@@ -138,7 +138,12 @@ class RegisteredUsers:
 
         pw1 = getpass.getpass(prompt="Enter Password: ")
         pw2 = getpass.getpass(prompt="Re-enter password: ")
+
         if name and email and pw1 and pw2:
+            #enforce password length to min of 12 characters
+            if (len(pw1) < 12) or (len(pw2) < 12):
+                raise RuntimeError("Invalid input")
+
             salt = make_salt()
             auth1 = Authentication(str(pw1), salt)
             auth2 = Authentication(str(pw2), salt)
@@ -153,7 +158,6 @@ class RegisteredUsers:
             return self.users[email_hash]
         else:
             raise RuntimeError("Invalid input")
-
 
 class Client:
     users: RegisteredUsers
