@@ -67,19 +67,17 @@ class TestRegistration(unittest.TestCase):
 
     def assert_initial_registered_users_dict_is_valid(self, d):
         for email, cd in d.items():
-            self.assertEqual(email, "email_v")
+            self.assertEqual(email, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
             self.assertEqual(cd["email"], email)
-            self.assertEqual(cd["name"], "name_v")
-            self.assertTrue(not cd["contacts"])
+            self.assertTrue(cd["name"])
+            self.assertTrue(cd["contacts"])
             self.assertTrue(cd["auth"]["salt"])
             self.assertTrue(cd["auth"]["key"])
 
     def assert_initial_registered_users_is_valid(self, ru):
         for email, cd in ru.items():
-            self.assertEqual(email, "email_v")
-            self.assertEqual(cd.email, email)
-            self.assertEqual(cd.name, "name_v")
-            self.assertTrue(not cd.contacts)
+            self.assertEqual(email, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
+            self.assertEqual(cd.email_hash, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
             self.assertTrue(cd.auth.salt)
             self.assertTrue(cd.auth.key)
 
@@ -134,7 +132,7 @@ class TestRegistration(unittest.TestCase):
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.login()
-                    self.assertTrue("email_v_2" not in client.users.users["email_v"].contacts)
+                    self.assertTrue("email_v_2" not in client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts)
 
     def test_aak_add_contact(self):
         """Ensures that client adds valid contacts successfully."""
@@ -144,8 +142,38 @@ class TestRegistration(unittest.TestCase):
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 client.login()
-                self.assertEqual(client.users.users["email_v"].contacts["email_v_2"], "name_v_2")
-                self.assertEqual(client.users.users["email_v"].contacts["email_v_3"], "name_v_3")
+                user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+                self.assertEqual(user.contacts["email_v_2"], "name_v_2")
+                self.assertEqual(user.contacts["email_v_3"], "name_v_3")
+
+    def test_aal_login_correct_password_decrypt_contact(self):
+        """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
+        client = Client(sd_filename)
+        user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+        user.email = "email_v"
+        self.assertNotEqual(user.enc_contacts, "name_v_3")
+        user.decrypt_name_contacts()
+        self.assertIsNotNone(user.contacts)
+        self.assertEqual(user.contacts["email_v_2"], "name_v_2")
+        self.assertEqual(user.contacts["email_v_3"], "name_v_3")
+
+    def test_aam_data_in_memory_after_decrypt(self):
+        """Ensures that Client data can be accessed in local memory after decryption"""
+        client = Client(sd_filename)
+        user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+        user.email = "email_v"
+        user.decrypt_name_contacts()
+        self.assertEqual(user.name, "name_v")
+        self.assertEqual(user.contacts["email_v_2"], "name_v_2")
+        self.assertEqual(user.contacts["email_v_3"], "name_v_3")
+
+    def test_aan_test_decrypt_wrong_password(self):
+        """Ensures that client throws an error when decryption is not successful (wrong key)."""
+        client = Client(sd_filename)
+        user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+        user.email = "email_v_"
+        with self.assertRaises(RuntimeError):
+            user.decrypt_name_contacts()
 
 
 if __name__ == '__main__':

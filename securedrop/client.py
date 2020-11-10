@@ -3,10 +3,14 @@ import getpass
 import os
 import hashlib
 import base64
+import Crypto.Util.Padding
+
+from Crypto.Random import get_random_bytes
+from Crypto.Cipher import AES
 
 
 def make_salt():
-    return os.urandom(32)
+    return get_random_bytes(32)
 
 
 class Authentication:
@@ -32,35 +36,79 @@ class Authentication:
 
     def make_dict(self):
         return {
-            "salt": base64.b64encode(self.salt).decode('ascii'),
-            "key": base64.b64encode(self.key).decode('ascii')
+            "salt": base64.b64encode(self.salt).decode('utf-8'),
+            "key": base64.b64encode(self.key).decode('utf-8')
         }
 
 
+class AESWrapper(object):
+
+    def __init__(self, key):
+        self.bs = AES.block_size
+        self.key = Crypto.Util.Padding.pad(key.encode('utf-8'), self.bs)
+
+    def encrypt(self, raw):
+        raw = Crypto.Util.Padding.pad(raw.encode('utf-8'), self.bs)
+        iv = get_random_bytes(AES.block_size)
+        cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        bytes_ = base64.b64encode(iv + cipher.encrypt(raw))
+        return bytes_.decode('utf-8')
+
+    def decrypt(self, enc):
+        try:
+            data = base64.b64decode(enc)
+            iv = data[:AES.block_size]
+            cipher = AES.new(self.key, AES.MODE_CBC, iv)
+            result = Crypto.Util.Padding.unpad(cipher.decrypt(data[AES.block_size:]), self.bs).decode('utf-8')
+            return result
+        except ValueError or KeyError:
+            raise RuntimeError("Decryption was not successful, could not verify input")
+
+
 class ClientData:
-    # todo: encrypt name and contacts
     name: str
     email: str
     contacts: dict
     auth: Authentication
+    email_hash: str
+    enc_name: str
+    enc_contacts: str
 
     def __init__(self, nm=None, em=None, cs=None, password=None, jdict=None):
         if jdict is not None:
-            self.name, self.email, self.contacts, self.auth = \
+            self.enc_name, self.email_hash, self.enc_contacts, self.auth = \
                 jdict["name"], jdict["email"], jdict["contacts"], Authentication(jdict=jdict["auth"])
         else:
             self.name, self.email, self.contacts, self.auth = nm, em, cs, Authentication(password)
+            self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
 
     def __eq__(self, other):
         return self.name == other.name
 
     def make_dict(self):
+        self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
+        self.encrypt_name_contacts()
         return {
-            "name": self.name,
-            "email": self.email,
-            "contacts": self.contacts,
+            "name": self.enc_name,
+            "email": self.email_hash,
+            "contacts": self.enc_contacts,
             "auth": self.auth.make_dict()
         }
+
+    def encrypt_name_contacts(self):
+        if self.email is None:
+            raise RuntimeError("Encrypt: A email/key must be provided")
+        enc = AESWrapper(self.email)
+        self.enc_name = enc.encrypt(self.name)
+        dump = json.dumps(self.contacts)
+        self.enc_contacts = enc.encrypt(dump)
+
+    def decrypt_name_contacts(self):
+        if self.email is None:
+            raise RuntimeError("Decrypt: A email/key must be provided")
+        enc = AESWrapper(self.email)
+        self.name = enc.decrypt(self.enc_name)
+        self.contacts = json.loads(enc.decrypt(self.enc_contacts))
 
 
 class RegisteredUsers:
@@ -98,10 +146,11 @@ class RegisteredUsers:
                 raise RuntimeError("The two entered passwords don't match!")
 
             print("Passwords Match.")
-            self.users[email] = ClientData(name, email, {}, pw1)
+            email_hash = hashlib.sha256((email.encode())).hexdigest()
+            self.users[email_hash] = ClientData(name, email, {}, pw1)
             self.write_json()
             print("User Registered.")
-            return self.users[email]
+            return self.users[email_hash]
         else:
             raise RuntimeError("Invalid input")
 
@@ -130,18 +179,18 @@ class Client:
             if not user:
                 email = input("Enter Email Address: ")
                 pw = getpass.getpass(prompt="Enter Password: ")
-
-                if email not in self.users.users:
+                email_hash = hashlib.sha256((email.encode())).hexdigest()
+                if email_hash not in self.users.users:
                     raise RuntimeError("That email address is not registered")
 
-                user = self.users.users[email]
+                user = self.users.users[email_hash]
                 auth = Authentication(str(pw), user.auth.salt)
-                if auth != self.users.users[email].auth:
+                if auth != self.users.users[email_hash].auth:
                     raise RuntimeError("Email and Password Combination Invalid.")
-
+                user.email = email
+                user.decrypt_name_contacts()
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
-
             while True:
                 command = input("secure_drop> ")
                 if command == "help":
