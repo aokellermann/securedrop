@@ -170,7 +170,7 @@ class TestRegistration(unittest.TestCase):
         client = Client(sd_filename)
         user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
         user.email = "email_v_"
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RuntimeError):
             user.decrypt_name_contacts()
 
 

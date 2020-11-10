@@ -61,8 +61,8 @@ class AESWrapper(object):
             cipher = AES.new(self.key, AES.MODE_CBC, iv)
             result = Crypto.Util.Padding.unpad(cipher.decrypt(data[AES.block_size:]), self.bs).decode('utf-8')
             return result
-        except ValueError:
-            raise ValueError("Decryption was not successful, could not verify input")
+        except ValueError or KeyError:
+            raise RuntimeError("Decryption was not successful, could not verify input")
 
 
 class ClientData:
@@ -81,7 +81,6 @@ class ClientData:
         else:
             self.name, self.email, self.contacts, self.auth = nm, em, cs, Authentication(password)
             self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
-            self.encrypt_name_contacts()
 
     def __eq__(self, other):
         return self.name == other.name
