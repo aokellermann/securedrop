@@ -29,7 +29,7 @@ def server_process():
         process = Process(target=driver.run)
         try:
             process.start()
-            time.sleep(0.1)
+            time.sleep(1)
             yield process
         finally:
             shm = shared_memory.SharedMemory(driver.shm_name())
@@ -52,25 +52,27 @@ class TestRegistration(unittest.TestCase):
 
     def test_aab_initial_ask_to_register_mismatching_passwords(self):
         """Ensures that client throws if the user inputs mismatching passwords during registration."""
-        se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
-        se2 = InputSideEffect(["password_v", "password_v_"])
-        with patch('builtins.input', side_effect=se1.se):
-            with patch('getpass.getpass', side_effect=se2.se):
-                with self.assertRaises(RuntimeError):
-                    client.main()
+        with server_process():
+            se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
+            se2 = InputSideEffect(["password_v", "password_v_"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    with self.assertRaises(RuntimeError):
+                        client.main()
 
     def test_aac_initial_ask_to_register_empty_input(self):
         """Ensures that client throws if the user inputs an empty string during registration."""
-        for i in range(0, 2):
-            for j in range(0, 2):
-                se_lists = [["y", "name_v", "email_v", "exit"], ["password_v", "password_v_"]]
-                se_lists[i][j + int(i == 0)] = ""
-                se1 = InputSideEffect(se_lists[0])
-                se2 = InputSideEffect(se_lists[1])
-                with patch('builtins.input', side_effect=se1.se):
-                    with patch('getpass.getpass', side_effect=se2.se):
-                        with self.assertRaises(RuntimeError):
-                            client.main()
+        with server_process():
+            for i in range(0, 2):
+                for j in range(0, 2):
+                    se_lists = [["y", "name_v", "email_v", "exit"], ["password_v", "password_v_"]]
+                    se_lists[i][j + int(i == 0)] = ""
+                    se1 = InputSideEffect(se_lists[0])
+                    se2 = InputSideEffect(se_lists[1])
+                    with patch('builtins.input', side_effect=se1.se):
+                        with patch('getpass.getpass', side_effect=se2.se):
+                            with self.assertRaises(RuntimeError):
+                                client.main()
 
     def test_aad_initial_registration_succeeds(self):
         """Ensures that client doesn't throw during valid registration."""

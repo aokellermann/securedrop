@@ -99,7 +99,7 @@ class Client(ClientBase):
         try:
             name, email, pw = self.users.register_prompt()
             await self.write(bytes(RegisterPackets(name, email, pw)))
-            msg = StatusPackets(data=await self.read()).message
+            msg = StatusPackets(data=(await self.read())[4:]).message
             if msg != "":
                 raise RuntimeError(msg)
             self.users.register_user(email)
@@ -115,7 +115,7 @@ class Client(ClientBase):
         try:
             email, pw = self.users.login_prompt()
             await self.write(bytes(LoginPackets(email, pw)))
-            msg = StatusPackets(data=await self.read()).message
+            msg = StatusPackets(data=(await self.read())[4:]).message
             if msg != "":
                 raise RuntimeError(msg)
         except RuntimeError as e:
@@ -159,7 +159,7 @@ class Client(ClientBase):
                 raise RuntimeError("Empty input.")
 
             await self.write(bytes(AddContactPackets(name, email)))
-            msg = StatusPackets(data=await self.read()).message
+            msg = StatusPackets(data=(await self.read())[4:]).message
             if msg != "":
                 raise RuntimeError(msg)
         except RuntimeError as e:

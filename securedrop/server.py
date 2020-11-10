@@ -117,7 +117,7 @@ class RegisteredUsers:
             return "Invalid email or contact."
         self.users[email].contacts[contact_email] = contact_name
         self.write_json()
-        return None
+        return ""
 
 
 class Server(ServerBase):
