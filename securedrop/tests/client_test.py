@@ -67,10 +67,8 @@ class TestRegistration(unittest.TestCase):
         for email, cd in d.items():
             self.assertEqual(email, "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3")
             self.assertEqual(cd["email"], email)
-            self.assertTrue(cd["name"]["data"])
-            self.assertTrue(cd["name"]["verify"])
-            self.assertTrue(cd["contacts"]["data"])
-            self.assertTrue(cd["contacts"]["verify"])
+            self.assertTrue(cd["name"])
+            self.assertTrue(cd["contacts"])
             self.assertTrue(cd["auth"]["salt"])
             self.assertTrue(cd["auth"]["key"])
 
@@ -146,7 +144,6 @@ class TestRegistration(unittest.TestCase):
                 self.assertEqual(user.contacts["email_v_2"], "name_v_2")
                 self.assertEqual(user.contacts["email_v_3"], "name_v_3")
 
-
     def test_aal_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
         client = Client(sd_filename)
@@ -173,7 +170,7 @@ class TestRegistration(unittest.TestCase):
         client = Client(sd_filename)
         user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
         user.email = "email_v_"
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             user.decrypt_name_contacts()
 
 
