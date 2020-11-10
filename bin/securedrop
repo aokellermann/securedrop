@@ -12,4 +12,6 @@ if __name__ == "__main__":
     securedrop_dir = os.path.join(home_dir, ".securedrop")
     if not os.path.exists(securedrop_dir):
         os.mkdir(securedrop_dir)
+        if not os.path.exists(securedrop_dir):
+            raise RuntimeError("Failed to create securedrop directory: $HOME/.securedrop")
     Client(os.path.join(securedrop_dir, "db.json")).login()
