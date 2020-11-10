@@ -61,11 +61,10 @@ class ServerBase(TCPServer):
     def run(self, port, shm_name):
         print("Server starting")
         self.shm = shared_memory.SharedMemory(shm_name)
-        self.bind(port)
-        self.start(0)
+        self.listen(port)
         print("Server starting main loop")
-        PeriodicCallback(self.check_stop, 100).start()
         try:
+            PeriodicCallback(self.check_stop, 100).start()
             IOLoop.current().start()
         finally:
             self.shm.close()

@@ -4,6 +4,8 @@ import unittest
 import os
 from multiprocessing import Process, shared_memory
 
+from tornado.testing import AsyncTestCase
+
 from securedrop.client_server_base import ClientBase, ServerBase
 
 #from tornado.testing import AsyncTestCase, gen_test
@@ -63,22 +65,22 @@ def echo_server_process():
         shm.unlink()
 
 
-class MyTestCase(unittest.TestCase):
+class EchoSingleThread(AsyncTestCase):
     def test_echo(self):
         with echo_server_process():
             for i in range(1, 2):
                 with self.subTest(i=i):
                     resp = [None]
                     data = os.urandom(2**i + i).replace(b'\n\n', b'')
-                    EchoClient(data, resp).run(5)
+                    EchoClient(data, resp).run(3)
                     self.assertEqual(data, resp[0])
 
-    def test_aecho_concurrent(self):
+    def test_echo_concurrent(self):
         clients_num = 1
         with echo_server_process():
             shm = shared_memory.SharedMemory(create=True, size=clients_num * 8)
             clients = [AsyncEchoClient(b"data" + i.to_bytes(4, byteorder='little'), shm.name, i * 8, i * 8 + 8) for i in range(clients_num)]
-            threads = [Process(target=client.run, args=(30,)) for client in clients]
+            threads = [Process(target=client.run, args=(3,)) for client in clients]
             for thread in threads:
                 thread.daemon = True
                 thread.start()
