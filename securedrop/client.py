@@ -12,8 +12,8 @@ from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 
 sd_filename = 'client.json'
-hostname = '127.0.0.1'
-port = 6969
+sd_hostname = '127.0.0.1'
+sd_port = 6969
 
 
 class RegisteredUsers:
@@ -168,8 +168,11 @@ class Client(ClientBase):
             print("Failed to add contact: ", msg)
 
 
-def main():
-    Client(hostname, port, sd_filename).run()
+def main(hostname=None, port=None, filename=None):
+    hostname = hostname if hostname is not None else sd_hostname
+    port = port if port is not None else sd_port
+    filename = filename if filename is not None else sd_filename
+    Client(hostname, port, filename).run()
 
 
 if __name__ == "__main__":

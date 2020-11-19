@@ -17,7 +17,7 @@ from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 
 sd_filename = 'server.json'
-port = 6969
+sd_port = 6969
 
 
 def make_salt():
@@ -222,7 +222,8 @@ class Server(ServerBase):
 
 
 class ServerDriver:
-    def __init__(self):
+    def __init__(self, port, filename):
+        self.port, self.filename = port, filename
         self.shm = shared_memory.SharedMemory(create=True, size=1)
         self.shm.buf[0] = 0
 
@@ -237,8 +238,8 @@ class ServerDriver:
 
     def run(self):
         try:
-            server = Server(sd_filename)
-            server.run(port, self.shm_name())
+            server = Server(self.filename)
+            server.run(self.port, self.shm_name())
         except Exception:
             print("Caught exception. Exiting...")
         finally:
@@ -249,6 +250,12 @@ class ServerDriver:
         self.shm.unlink()
 
 
-if __name__ == "__main__":
-    with ServerDriver() as driver:
+def main(port=None, filename=None):
+    port = port if port is not None else sd_port
+    filename = filename if filename is not None else sd_filename
+    with ServerDriver(port, filename) as driver:
         driver.run()
+
+
+if __name__ == "__main__":
+    main()
