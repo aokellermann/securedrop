@@ -71,7 +71,7 @@ class EchoSingleThread(AsyncTestCase):
             for i in range(1, 27):
                 with self.subTest(i=i):
                     resp = [None]
-                    data = os.urandom(2**i + i).replace(b'\n\n', b'')
+                    data = os.urandom(2**i + i).replace(b'\n', b'')
                     EchoClient(data, resp).run(30)
                     self.assertEqual(data, resp[0])
 

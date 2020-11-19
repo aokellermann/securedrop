@@ -141,9 +141,10 @@ class RegisteredUsers:
             json.dump(self.make_dict(), f)
 
     def register_new_user(self, name, email, password):
-        if email in self.users:
+        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        if email_hash in self.users:
             return "User already exists."
-        self.users[email] = ClientData(name=name, email=email, password=password)
+        self.users[email_hash] = ClientData(name=name, email=email, password=password, contacts=dict())
         self.write_json()
         print("User Registered.")
         return ""
@@ -167,7 +168,12 @@ class RegisteredUsers:
     def add_contact(self, email, contact_name, contact_email):
         if not contact_email or not contact_name:
             return "Invalid email or contact."
-        self.users[email].contacts[contact_email] = contact_name
+
+        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        user = self.users[email_hash]
+        if not user.contacts:
+            user.contacts = dict()
+        user.contacts[contact_email] = contact_name
         self.write_json()
         return ""
 

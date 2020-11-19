@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import securedrop.client as client
-from securedrop.server import ServerDriver, Server, sd_filename
+from securedrop.server import ServerDriver, Server, sd_filename, AESWrapper
 import json
 import time
 import contextlib
@@ -154,8 +154,10 @@ class TestRegistration(unittest.TestCase):
                         client.main()
                         with open(sd_filename, 'r') as f:
                             jdict = json.load(f)
-                            self.assertTrue("email_v_2" not in jdict[
-                                "05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts)
+                            contacts = json.loads(AESWrapper("email_v")
+                                                  .decrypt(
+                                jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]["contacts"]))
+                            self.assertEqual(dict(), contacts)
 
     def test_aak_add_contact(self):
         """Ensures that client adds valid contacts successfully."""
@@ -165,11 +167,13 @@ class TestRegistration(unittest.TestCase):
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
-        with open(sd_filename, 'r') as f:
-            jdict = json.load(f)
-            user = jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
-            self.assertEqual("name_v_2", user["contacts"]["email_v_2"])
-            self.assertEqual("name_v_3", user["contacts"]["email_v_3"])
+                    with open(sd_filename, 'r') as f:
+                        jdict = json.load(f)
+                        contacts = json.loads(AESWrapper("email_v")
+                                              .decrypt(
+                            jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]["contacts"]))
+                        self.assertEqual("name_v_2", contacts["email_v_2"])
+                        self.assertEqual("name_v_3", contacts["email_v_3"])
 
     def test_aal_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
