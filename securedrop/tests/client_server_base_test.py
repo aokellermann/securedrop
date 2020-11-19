@@ -68,7 +68,7 @@ def echo_server_process():
 class EchoSingleThread(AsyncTestCase):
     def test_echo(self):
         with echo_server_process():
-            for i in range(1, 25):
+            for i in range(1, 27):
                 with self.subTest(i=i):
                     resp = [None]
                     data = os.urandom(2**i + i).replace(b'\n\n', b'')
@@ -76,7 +76,7 @@ class EchoSingleThread(AsyncTestCase):
                     self.assertEqual(data, resp[0])
 
     def test_echo_concurrent(self):
-        clients_num = 100
+        clients_num = 200
         with echo_server_process():
             shm = shared_memory.SharedMemory(create=True, size=clients_num * 8)
             clients = [AsyncEchoClient(b"data" + i.to_bytes(4, byteorder='little'), shm.name, i * 8, i * 8 + 8) for i in range(clients_num)]
