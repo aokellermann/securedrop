@@ -222,7 +222,9 @@ class Server(ServerBase):
 
 
 class ServerDriver:
-    def __init__(self, port, filename):
+    def __init__(self, port=None, filename=None):
+        port = port if port is not None else sd_port
+        filename = filename if filename is not None else sd_filename
         self.port, self.filename = port, filename
         self.shm = shared_memory.SharedMemory(create=True, size=1)
         self.shm.buf[0] = 0
