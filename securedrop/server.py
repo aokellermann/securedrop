@@ -6,6 +6,10 @@ import hashlib
 import json
 from multiprocessing import shared_memory
 
+from Crypto.Random import get_random_bytes
+from Crypto.Cipher import AES
+import Crypto.Util.Padding
+
 from securedrop import ServerBase
 from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
@@ -17,7 +21,7 @@ port = 6969
 
 
 def make_salt():
-    return os.urandom(32)
+    return get_random_bytes(32)
 
 
 class Authentication:
@@ -43,37 +47,78 @@ class Authentication:
 
     def make_dict(self):
         return {
-            "salt": base64.b64encode(self.salt).decode('ascii'),
-            "key": base64.b64encode(self.key).decode('ascii')
+            "salt": base64.b64encode(self.salt).decode('utf-8'),
+            "key": base64.b64encode(self.key).decode('utf-8')
         }
 
 
+class AESWrapper(object):
+    def __init__(self, key):
+        self.bs = AES.block_size
+        self.key = Crypto.Util.Padding.pad(key.encode('utf-8'), self.bs)
+
+    def encrypt(self, raw):
+        raw = Crypto.Util.Padding.pad(raw.encode('utf-8'), self.bs)
+        iv = get_random_bytes(AES.block_size)
+        cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        bytes_ = base64.b64encode(iv + cipher.encrypt(raw))
+        return bytes_.decode('utf-8')
+
+    def decrypt(self, enc):
+        try:
+            data = base64.b64decode(enc)
+            iv = data[:AES.block_size]
+            cipher = AES.new(self.key, AES.MODE_CBC, iv)
+            result = Crypto.Util.Padding.unpad(cipher.decrypt(data[AES.block_size:]), self.bs).decode('utf-8')
+            return result
+        except ValueError or KeyError:
+            raise RuntimeError("Decryption was not successful, could not verify input")
+
+
 class ClientData:
-    # todo: encrypt name and contacts
     name: str
     email: str
     contacts: dict
     auth: Authentication
+    email_hash: str
+    enc_name: str
+    enc_contacts: str
 
     def __init__(self, name=None, email=None, contacts=None, password=None, jdict=None):
         if jdict is not None:
-            self.name, self.email, self.contacts, self.auth = \
+            self.enc_name, self.email_hash, self.enc_contacts, self.auth = \
                 jdict["name"], jdict["email"], jdict["contacts"], Authentication(jdict=jdict["auth"])
         else:
             self.name, self.email, self.contacts, self.auth = name, email, contacts, Authentication(password)
-        if self.contacts is None:
-            self.contacts = dict()
+            self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
 
     def __eq__(self, other):
         return self.name == other.name
 
     def make_dict(self):
+        self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
+        self.encrypt_name_contacts()
         return {
-            "name": self.name,
-            "email": self.email,
-            "contacts": self.contacts,
+            "name": self.enc_name,
+            "email": self.email_hash,
+            "contacts": self.enc_contacts,
             "auth": self.auth.make_dict()
         }
+
+    def encrypt_name_contacts(self):
+        if self.email is None:
+            raise RuntimeError("Encrypt: A email/key must be provided")
+        enc = AESWrapper(self.email)
+        self.enc_name = enc.encrypt(self.name)
+        dump = json.dumps(self.contacts)
+        self.enc_contacts = enc.encrypt(dump)
+
+    def decrypt_name_contacts(self):
+        if self.email is None:
+            raise RuntimeError("Decrypt: A email/key must be provided")
+        enc = AESWrapper(self.email)
+        self.name = enc.decrypt(self.enc_name)
+        self.contacts = json.loads(enc.decrypt(self.enc_contacts))
 
 
 class RegisteredUsers:
@@ -104,12 +149,19 @@ class RegisteredUsers:
         return ""
 
     def login(self, email, password):
-        if email not in self.users:
-            print("That user doesn't exist.")
-            return "That user doesn't exist."
-        if Authentication(key=password, salt=self.users[email].auth.salt) != self.users[email].auth:
-            print("Wrong password.")
-            return "Wrong password."
+        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        if email_hash not in self.users:
+            print("Email and Password Combination Invalid.")
+            return "Email and Password Combination Invalid."
+
+        user = self.users[email_hash]
+        auth = Authentication(str(password), user.auth.salt)
+        if auth != self.users[email_hash].auth:
+            print("Email and Password Combination Invalid.")
+            return "Email and Password Combination Invalid."
+
+        user.email = email
+        user.decrypt_name_contacts()
         return ""
 
     def add_contact(self, email, contact_name, contact_email):

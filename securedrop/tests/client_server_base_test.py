@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import time
 from contextlib import contextmanager
 import unittest
@@ -7,8 +9,6 @@ from multiprocessing import Process, shared_memory
 from tornado.testing import AsyncTestCase
 
 from securedrop.client_server_base import ClientBase, ServerBase
-
-#from tornado.testing import AsyncTestCase, gen_test
 
 hostname = "localhost"
 port = 6969
@@ -72,7 +72,7 @@ class EchoSingleThread(AsyncTestCase):
                 with self.subTest(i=i):
                     resp = [None]
                     data = os.urandom(2**i + i).replace(b'\n\n', b'')
-                    EchoClient(data, resp).run(10)
+                    EchoClient(data, resp).run(30)
                     self.assertEqual(data, resp[0])
 
     def test_echo_concurrent(self):
@@ -80,7 +80,7 @@ class EchoSingleThread(AsyncTestCase):
         with echo_server_process():
             shm = shared_memory.SharedMemory(create=True, size=clients_num * 8)
             clients = [AsyncEchoClient(b"data" + i.to_bytes(4, byteorder='little'), shm.name, i * 8, i * 8 + 8) for i in range(clients_num)]
-            threads = [Process(target=client.run, args=(10,)) for client in clients]
+            threads = [Process(target=client.run, args=(30,)) for client in clients]
             for thread in threads:
                 thread.daemon = True
                 thread.start()
