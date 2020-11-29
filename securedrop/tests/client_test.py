@@ -57,16 +57,16 @@ class TestRegistration(unittest.TestCase):
                         with self.assertRaises(RuntimeError):
                             Client(sd_filename).login()
 
-    def test_aad_initial_ask_to_register_password_too_short(self):
+    def test_initial_ask_to_register_password_too_short(self):
         """Ensures that client throws if the user inputs a password that is too short during registration."""
         se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
         se2 = InputSideEffect(["password_v1", "password_v1"])
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 with self.assertRaises(RuntimeError):
-                    Client(sd_filename)
+                    Client(sd_filename).login()
 
-    def test_aae_initial_registration_succeeds(self):
+    def test_aad_initial_registration_succeeds(self):
         """Ensures that client doesn't throw during valid registration."""
         se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
         se2 = InputSideEffect(["password_v12", "password_v12"])
@@ -90,37 +90,36 @@ class TestRegistration(unittest.TestCase):
             self.assertTrue(cd.auth.salt)
             self.assertTrue(cd.auth.key)
 
-
-    def test_aaf_initial_json_valid(self):
+    def test_aae_initial_json_valid(self):
         """Ensures that client serializes to JSON correctly after registration."""
         with open(sd_filename, 'r') as f:
             jdict = json.load(f)
             self.assert_initial_registered_users_dict_is_valid(jdict)
 
-    def test_aag_initial_load_from_json(self):
+    def test_aaf_initial_load_from_json(self):
         """Ensures that client deserializes from JSON correctly."""
         client = Client(sd_filename)
         self.assert_initial_registered_users_is_valid(client.users.users)
 
-    def test_aah_login_unknown_email(self):
+    def test_aag_login_unknown_email(self):
         """Ensures that client throws if trying to login with an invalid email."""
         se1 = InputSideEffect(["email_v_"])
-        se2 = InputSideEffect(["password_v12"])
+        se2 = InputSideEffect(["password_v"])
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 with self.assertRaises(RuntimeError):
                     Client(sd_filename).login()
 
-    def test_aai_login_wrong_password(self):
+    def test_aah_login_wrong_password(self):
         """Ensures that client throws if trying to login with an invalid password."""
         se1 = InputSideEffect(["email_v"])
-        se2 = InputSideEffect(["password_v12_"])
+        se2 = InputSideEffect(["password_v_"])
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 with self.assertRaises(RuntimeError):
                     Client(sd_filename).login()
 
-    def test_aaj_login_correct_password(self):
+    def test_aai_login_correct_password(self):
         """Ensures that client logs in successfully with correct email/password."""
         se1 = InputSideEffect(["email_v", "exit"])
         se2 = InputSideEffect(["password_v12"])
@@ -128,7 +127,7 @@ class TestRegistration(unittest.TestCase):
             with patch('getpass.getpass', side_effect=se2.se):
                 Client(sd_filename).login()
 
-    def test_aak_add_contact_empty_input(self):
+    def test_aaj_add_contact_empty_input(self):
         """Ensures that client does not add a new contact if the input is an empty string."""
         for i in range(0, 2):
             se_list = ["email_v", "add", "name_v_2", "email_v_2", "exit"]
@@ -141,7 +140,7 @@ class TestRegistration(unittest.TestCase):
                     client.login()
                     self.assertTrue("email_v_2" not in client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts)
 
-    def test_aal_add_contact(self):
+    def test_aak_add_contact(self):
         """Ensures that client adds valid contacts successfully."""
         se1 = InputSideEffect(["email_v", "add", "name_v_2", "email_v_2", "add", "name_v_3", "email_v_3", "exit"])
         se2 = InputSideEffect(["password_v12"])
