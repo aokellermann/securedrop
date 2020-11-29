@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+
+import os
+from securedrop.client import Client
+
+
+if __name__ == "__main__":
+    home_dir = os.getenv("HOME")
+    if home_dir is None:
+        raise RuntimeError("HOME not found")
+
+    securedrop_dir = os.path.join(home_dir, ".securedrop")
+    if not os.path.exists(securedrop_dir):
+        os.mkdir(securedrop_dir)
+        if not os.path.exists(securedrop_dir):
+            raise RuntimeError("Failed to create securedrop directory: $HOME/.securedrop")
+    Client(os.path.join(securedrop_dir, "db.json")).login()

@@ -9,9 +9,7 @@ jobs:
       - checkout
       - run:
           name: Install required tools
-          command: pacman -Sy --noconfirm base base-devel git python python-json5
+          command: pacman -Sy --noconfirm base base-devel git python python-json5 python-pycryptodome
       - run:
           name: Unit Test
-          command: |
-            PYTHONPATH=$PYTHONPATH:. python securedrop/tests/client_test.py
-            PYTHONPATH=$PYTHONPATH:. python securedrop/tests/command_test.py
+          command: ./scripts/test.sh
