@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import securedrop.client as client
-from securedrop.server import ServerDriver, Server, sd_filename, AESWrapper
+from securedrop.server import ServerDriver, Server, DEFAULT_filename, AESWrapper
 import json
 import time
 import contextlib
@@ -103,13 +103,13 @@ class TestRegistration(unittest.TestCase):
 
     def test_aae_initial_json_valid(self):
         """Ensures that client serializes to JSON correctly after registration."""
-        with open(sd_filename, 'r') as f:
+        with open(DEFAULT_filename, 'r') as f:
             jdict = json.load(f)
             self.assert_initial_registered_users_dict_is_valid(jdict)
 
     def test_aaf_initial_load_from_json(self):
         """Ensures that client deserializes from JSON correctly."""
-        serv = Server(sd_filename)
+        serv = Server(DEFAULT_filename)
         self.assert_initial_registered_users_is_valid(serv.users.users)
 
     def test_aag_login_unknown_email(self):
@@ -152,7 +152,7 @@ class TestRegistration(unittest.TestCase):
                 with patch('builtins.input', side_effect=se1.se):
                     with patch('getpass.getpass', side_effect=se2.se):
                         client.main()
-                        with open(sd_filename, 'r') as f:
+                        with open(DEFAULT_filename, 'r') as f:
                             jdict = json.load(f)
                             contacts = json.loads(AESWrapper("email_v")
                                                   .decrypt(
@@ -167,7 +167,7 @@ class TestRegistration(unittest.TestCase):
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
-                    with open(sd_filename, 'r') as f:
+                    with open(DEFAULT_filename, 'r') as f:
                         jdict = json.load(f)
                         contacts = json.loads(AESWrapper("email_v")
                                               .decrypt(
@@ -177,7 +177,7 @@ class TestRegistration(unittest.TestCase):
 
     def test_aal_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
-        server = Server(sd_filename)
+        server = Server(DEFAULT_filename)
         user = server.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
         user.email = "email_v"
         self.assertNotEqual(user.enc_contacts, "name_v_3")
@@ -188,7 +188,7 @@ class TestRegistration(unittest.TestCase):
 
     def test_aam_data_in_memory_after_decrypt(self):
         """Ensures that Client data can be accessed in local memory after decryption"""
-        server = Server(sd_filename)
+        server = Server(DEFAULT_filename)
         user = server.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
         user.email = "email_v"
         user.decrypt_name_contacts()
@@ -198,7 +198,7 @@ class TestRegistration(unittest.TestCase):
 
     def test_aan_test_decrypt_wrong_password(self):
         """Ensures that client throws an error when decryption is not successful (wrong key)."""
-        server = Server(sd_filename)
+        server = Server(DEFAULT_filename)
         user = server.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
         user.email = "email_v_"
         with self.assertRaises(RuntimeError):

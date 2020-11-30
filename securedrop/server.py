@@ -16,8 +16,8 @@ from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 
-sd_filename = 'server.json'
-sd_port = 6969
+DEFAULT_filename = 'server.json'
+DEFAULT_PORT = 6969
 
 
 def make_salt():
@@ -223,8 +223,8 @@ class Server(ServerBase):
 
 class ServerDriver:
     def __init__(self, port=None, filename=None):
-        port = port if port is not None else sd_port
-        filename = filename if filename is not None else sd_filename
+        port = port if port is not None else DEFAULT_PORT
+        filename = filename if filename is not None else DEFAULT_filename
         self.port, self.filename = port, filename
         self.sentinel = shared_memory.SharedMemory(create=True, size=1)
         self.sentinel.buf[0] = 0
@@ -253,8 +253,8 @@ class ServerDriver:
 
 
 def main(port=None, filename=None):
-    port = port if port is not None else sd_port
-    filename = filename if filename is not None else sd_filename
+    port = port if port is not None else DEFAULT_PORT
+    filename = filename if filename is not None else DEFAULT_filename
     with ServerDriver(port, filename) as driver:
         driver.run()
 

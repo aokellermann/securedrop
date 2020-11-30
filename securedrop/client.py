@@ -11,9 +11,9 @@ from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 
-sd_filename = 'client.json'
-sd_hostname = '127.0.0.1'
-sd_port = 6969
+DEFAULT_FILENAME = 'client.json'
+DEFAULT_HOSTNAME = '127.0.0.1'
+DEFAULT_PORT = 6969
 
 
 class RegisteredUsers:
@@ -169,9 +169,9 @@ class Client(ClientBase):
 
 
 def main(hostname=None, port=None, filename=None):
-    hostname = hostname if hostname is not None else sd_hostname
-    port = port if port is not None else sd_port
-    filename = filename if filename is not None else sd_filename
+    hostname = hostname if hostname is not None else DEFAULT_HOSTNAME
+    port = port if port is not None else DEFAULT_PORT
+    filename = filename if filename is not None else DEFAULT_FILENAME
     Client(hostname, port, filename).run()
 
 

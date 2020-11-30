@@ -10,13 +10,13 @@ from tornado.testing import AsyncTestCase
 
 from securedrop.client_server_base import ClientBase, ServerBase
 
-hostname = "localhost"
-port = 6969
+HOSTNAME = "localhost"
+PORT = 6969
 
 
 class EchoClient(ClientBase):
     def __init__(self, data, response, start_index=0, end_index=None):
-        super().__init__(hostname, port)
+        super().__init__(HOSTNAME, PORT)
         self.data = data
         self.response = response
         self.start_index = start_index
@@ -53,7 +53,7 @@ def echo_server_process():
     shm = shared_memory.SharedMemory(create=True, size=1)
     shm.buf[0] = 0
     server = EchoServer()
-    process = Process(target=server.run, args=(port, shm.name,))
+    process = Process(target=server.run, args=(PORT, shm.name,))
     try:
         process.start()
         time.sleep(0.1)
