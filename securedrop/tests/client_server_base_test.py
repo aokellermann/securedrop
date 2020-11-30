@@ -70,10 +70,10 @@ class EchoSingleThread(AsyncTestCase):
         with echo_server_process():
             for i in range(1, 27):
                 with self.subTest(i=i):
-                    resp = [None]
+                    response = [None]
                     data = os.urandom(2**i + i).replace(b'\n', b'')
-                    EchoClient(data, resp).run(30)
-                    self.assertEqual(data, resp[0])
+                    EchoClient(data, response).run(30)
+                    self.assertEqual(data, response[0])
 
     def test_echo_concurrent(self):
         clients_num = 200
