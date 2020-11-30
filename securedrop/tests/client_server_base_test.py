@@ -32,15 +32,15 @@ class EchoClient(ClientBase):
 
 
 class AsyncEchoClient(EchoClient):
-    def __init__(self, data, shm_name, start_index, end_index):
-        self.shm = shared_memory.SharedMemory(shm_name)
-        super().__init__(data, self.shm.buf, start_index, end_index)
+    def __init__(self, data, sentinel_name, start_index, end_index):
+        self.sentinel = shared_memory.SharedMemory(sentinel_name)
+        super().__init__(data, self.sentinel.buf, start_index, end_index)
 
     async def main(self):
         try:
             await super().main()
         finally:
-            self.shm.close()
+            self.sentinel.close()
 
 
 class EchoServer(ServerBase):
@@ -50,19 +50,19 @@ class EchoServer(ServerBase):
 
 @contextmanager
 def echo_server_process():
-    shm = shared_memory.SharedMemory(create=True, size=1)
-    shm.buf[0] = 0
+    sentinel = shared_memory.SharedMemory(create=True, size=1)
+    sentinel.buf[0] = 0
     server = EchoServer()
-    process = Process(target=server.run, args=(PORT, shm.name,))
+    process = Process(target=server.run, args=(PORT, sentinel.name,))
     try:
         process.start()
         time.sleep(0.1)
         yield process
     finally:
-        shm.buf[0] = 1
+        sentinel.buf[0] = 1
         process.join()
-        shm.close()
-        shm.unlink()
+        sentinel.close()
+        sentinel.unlink()
 
 
 class EchoSingleThread(AsyncTestCase):
@@ -78,8 +78,8 @@ class EchoSingleThread(AsyncTestCase):
     def test_echo_concurrent(self):
         clients_num = 200
         with echo_server_process():
-            shm = shared_memory.SharedMemory(create=True, size=clients_num * 8)
-            clients = [AsyncEchoClient(b"data" + i.to_bytes(4, byteorder='little'), shm.name, i * 8, i * 8 + 8) for i in range(clients_num)]
+            sentinel = shared_memory.SharedMemory(create=True, size=clients_num * 8)
+            clients = [AsyncEchoClient(b"data" + i.to_bytes(4, byteorder='little'), sentinel.name, i * 8, i * 8 + 8) for i in range(clients_num)]
             threads = [Process(target=client.run, args=(30,)) for client in clients]
             for thread in threads:
                 thread.daemon = True
@@ -87,9 +87,9 @@ class EchoSingleThread(AsyncTestCase):
             for thread in threads:
                 thread.join()
             for i in range(clients_num):
-                self.assertEqual(b"data" + i.to_bytes(4, byteorder='little'), bytes(shm.buf[i * 8:i * 8 + 8]))
-            shm.close()
-            shm.unlink()
+                self.assertEqual(b"data" + i.to_bytes(4, byteorder='little'), bytes(sentinel.buf[i * 8:i * 8 + 8]))
+            sentinel.close()
+            sentinel.unlink()
 
 
 if __name__ == '__main__':

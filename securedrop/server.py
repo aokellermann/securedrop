@@ -235,13 +235,13 @@ class ServerDriver:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def shm_name(self):
+    def sentinel_name(self):
         return self.sentinel.name
 
     def run(self):
         try:
             server = Server(self.filename)
-            server.run(self.port, self.shm_name())
+            server.run(self.port, self.sentinel_name())
         except Exception:
             print("Caught exception. Exiting...")
         finally:

@@ -34,9 +34,9 @@ def server_process():
             time.sleep(1)
             yield process
         finally:
-            shm = shared_memory.SharedMemory(driver.shm_name())
-            shm.buf[0] = 1
-            shm.close()
+            sentinel = shared_memory.SharedMemory(driver.sentinel_name())
+            sentinel.buf[0] = 1
+            sentinel.close()
             process.join()
 
 
