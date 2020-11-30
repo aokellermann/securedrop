@@ -15,10 +15,10 @@ port = 6969
 
 
 class EchoClient(ClientBase):
-    def __init__(self, data, resp, start_index=0, end_index=None):
+    def __init__(self, data, response, start_index=0, end_index=None):
         super().__init__(hostname, port)
         self.data = data
-        self.resp = resp
+        self.response = response
         self.start_index = start_index
         self.end_index = end_index
 
@@ -26,9 +26,9 @@ class EchoClient(ClientBase):
         await super().main()
         await self.write(self.data)
         if self.end_index is None:
-            self.resp[self.start_index] = await self.read()
+            self.response[self.start_index] = await self.read()
         else:
-            self.resp[self.start_index:self.end_index] = await self.read()
+            self.response[self.start_index:self.end_index] = await self.read()
 
 
 class AsyncEchoClient(EchoClient):

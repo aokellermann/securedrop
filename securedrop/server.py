@@ -226,8 +226,8 @@ class ServerDriver:
         port = port if port is not None else sd_port
         filename = filename if filename is not None else sd_filename
         self.port, self.filename = port, filename
-        self.shm = shared_memory.SharedMemory(create=True, size=1)
-        self.shm.buf[0] = 0
+        self.sentinel = shared_memory.SharedMemory(create=True, size=1)
+        self.sentinel.buf[0] = 0
 
     def __enter__(self):
         return self
@@ -236,7 +236,7 @@ class ServerDriver:
         self.close()
 
     def shm_name(self):
-        return self.shm.name
+        return self.sentinel.name
 
     def run(self):
         try:
@@ -245,11 +245,11 @@ class ServerDriver:
         except Exception:
             print("Caught exception. Exiting...")
         finally:
-            self.shm.buf[0] = 1
+            self.sentinel.buf[0] = 1
 
     def close(self):
-        self.shm.close()
-        self.shm.unlink()
+        self.sentinel.close()
+        self.sentinel.unlink()
 
 
 def main(port=None, filename=None):
