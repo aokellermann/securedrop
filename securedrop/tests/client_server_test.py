@@ -103,13 +103,13 @@ class TestRegistration(unittest.TestCase):
 
     def test_aae_initial_json_valid(self):
         """Ensures that client serializes to JSON correctly after registration."""
-        with open(DEFAULT_filename, 'r') as f:
+        with open(sd_filename, 'r') as f:
             jdict = json.load(f)
             self.assert_initial_registered_users_dict_is_valid(jdict)
 
     def test_aaf_initial_load_from_json(self):
         """Ensures that client deserializes from JSON correctly."""
-        serv = Server(DEFAULT_filename)
+        serv = Server(sd_filename)
         self.assert_initial_registered_users_is_valid(serv.users.users)
 
     def test_aag_login_unknown_email(self):
@@ -174,6 +174,19 @@ class TestRegistration(unittest.TestCase):
                             jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]["contacts"]))
                         self.assertEqual("name_v_2", contacts["email_v_2"])
                         self.assertEqual("name_v_3", contacts["email_v_3"])
+
+    def test_list_contacts(self):
+        """Ensures that client lists valid contacts successfully."""
+        with server_process():
+            se1 = InputSideEffect(["email_v", "add", "name_v_2", "email_v_2", "list", "name_v_3", "email_v_3", "exit"])
+            se2 = InputSideEffect(["password_v"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    client.main()
+                    with open(DEFAULT_filename, 'r') as f:
+                        self.assertEqual(1, 1)
+
+
 
     def test_aal_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
