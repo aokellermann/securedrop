@@ -103,13 +103,13 @@ class TestRegistration(unittest.TestCase):
 
     def test_aae_initial_json_valid(self):
         """Ensures that client serializes to JSON correctly after registration."""
-        with open(sd_filename, 'r') as f:
+        with open(DEFAULT_filename, 'r') as f:
             jdict = json.load(f)
             self.assert_initial_registered_users_dict_is_valid(jdict)
 
     def test_aaf_initial_load_from_json(self):
         """Ensures that client deserializes from JSON correctly."""
-        serv = Server(sd_filename)
+        serv = Server(DEFAULT_filename)
         self.assert_initial_registered_users_is_valid(serv.users.users)
 
     def test_aag_login_unknown_email(self):

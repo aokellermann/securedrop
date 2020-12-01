@@ -170,7 +170,7 @@ class Client(ClientBase):
             print("Failed to add contact: ", msg)
 
     async def list_contacts(self):
-        msg = None
+        msg = ""
         try:
             with open(sd_filename, 'r') as f:
                 jdict = json.load(f)
