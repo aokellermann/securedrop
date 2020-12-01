@@ -4,17 +4,15 @@ LIST_CONTACTS_RESPONSE_PACKETS_NAME = b"LCPRN"
 
 
 class ListContactsPacketsResponse:
-    def __init__(self, name: str = None, email: str = None, data=None):
-        self.name, self.email = name, email
+    def __init__(self, contacts=None, data=None):
+        self.contacts = contacts
         self.jdict = dict()
         if data is not None:
             self.jdict = json.loads(data)
-            self.name = self.jdict["name"]
-            self.email = self.jdict["email"]
-        elif name is not None:
+            self.message = self.jdict["contacts"]
+        elif contacts is not None:
             self.jdict = {
-                "name": self.name,
-                "email": self.email
+                "contacts": self.message,
             }
 
     def __bytes__(self):
