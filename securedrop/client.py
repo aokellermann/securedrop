@@ -177,7 +177,9 @@ class Client(ClientBase):
                 email = jdict[0]
 
                 await self.write(bytes(ListContactsPackets(email)))
-                msg = ListContactsPacketsResponse(data=(await self.read())[4:]).message
+                contact_dict = ListContactsPacketsResponse(data=(await self.read())[4:]).message
+
+                print("Contacts dictionary: ",  contact_dict)
 
         except RuntimeError as e:
             msg = str(e)
