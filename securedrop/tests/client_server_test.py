@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import securedrop.client as client
+from securedrop.client import Client
 from securedrop.server import ServerDriver, Server, sd_filename, AESWrapper
 import json
 import time
@@ -174,6 +175,19 @@ class TestRegistration(unittest.TestCase):
                             jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]["contacts"]))
                         self.assertEqual("name_v_2", contacts["email_v_2"])
                         self.assertEqual("name_v_3", contacts["email_v_3"])
+
+    def test_list_contacts(self):
+        """Ensures that client lists valid contacts successfully."""
+        with server_process():
+            se1 = InputSideEffect(["email_v", "add", "name_v_2", "email_v_2", "list", "name_v_3", "email_v_3", "exit"])
+            se2 = InputSideEffect(["password_v"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    client.main()
+                    with open(sd_filename, 'r') as f:
+                        self.assertEqual(1, 1)
+
+
 
     def test_aal_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""

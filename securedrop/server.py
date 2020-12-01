@@ -15,6 +15,8 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
+from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsPacketsResponse
 
 sd_filename = 'server.json'
 sd_port = 6969
@@ -177,6 +179,15 @@ class RegisteredUsers:
         self.write_json()
         return ""
 
+    def list_contacts(self, email):
+        print("List contacts in registered users class")
+        if not email:
+            return "invalid email"
+        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        user = self.users[email_hash]
+        print(user.contacts)
+        return user.contacts
+
 
 class Server(ServerBase):
     def __init__(self, filename):
@@ -198,9 +209,14 @@ class Server(ServerBase):
             await self.process_login(LoginPackets(data=data), stream)
         elif prefix == ADD_CONTACT_PACKETS_NAME:
             await self.add_contact(AddContactPackets(data=data), stream)
+        elif prefix == LIST_CONTACTS_PACKETS_NAME:
+            await self.list_contacts(ListContactsPackets(data=data), stream)
 
     async def write_status(self, stream, msg):
         await self.write(stream, bytes(StatusPackets(msg)))
+
+    async def write_list_contacts_response(self, stream, msg):
+        await self.write(stream, bytes(ListContactsPacketsResponse(msg)))
 
     async def process_register(self, reg, stream):
         msg = self.users.register_new_user(reg.name, reg.email, reg.password)
@@ -220,6 +236,9 @@ class Server(ServerBase):
         msg = self.users.add_contact(self.sock_to_email[stream], addc.name, addc.email)
         await self.write_status(stream, msg)
 
+    async def list_contacts(self, lstc, stream):
+        msg = self.users.list_contacts(lstc.email)
+        await self.write_list_contacts_response(stream, msg)
 
 class ServerDriver:
     def __init__(self, port=None, filename=None):

@@ -10,6 +10,8 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
+from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsPacketsResponse
 
 sd_filename = 'client.json'
 sd_hostname = '127.0.0.1'
@@ -140,7 +142,7 @@ class Client(ClientBase):
                 elif cmd == "add":
                     await self.add_contact()
                 elif cmd == "list":
-                    pass
+                    await self.list_contacts()
                 elif cmd == "send":
                     pass
                 elif cmd == "exit":
@@ -166,6 +168,21 @@ class Client(ClientBase):
             msg = str(e)
         if msg != "":
             print("Failed to add contact: ", msg)
+
+    async def list_contacts(self):
+        msg = None
+        try:
+            with open(sd_filename, 'r') as f:
+                jdict = json.load(f)
+                email = jdict[0]
+
+                await self.write(bytes(ListContactsPackets(email)))
+                msg = ListContactsPacketsResponse(data=(await self.read())[4:]).message
+
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to list contacts: ", msg)
 
 
 def main(hostname=None, port=None, filename=None):
