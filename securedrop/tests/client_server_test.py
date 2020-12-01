@@ -184,9 +184,7 @@ class TestRegistration(unittest.TestCase):
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
-                    with open(sd_filename, 'r') as f:
-                        self.assertEqual(1, 1)
-
+                    self.assertEqual(1, 1)
 
 
     def test_aal_login_correct_password_decrypt_contact(self):
