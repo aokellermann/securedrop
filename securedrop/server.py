@@ -6,6 +6,8 @@ import hashlib
 import json
 from multiprocessing import shared_memory
 
+from email_validator import validate_email, EmailNotValidError
+
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES
 import Crypto.Util.Padding
@@ -121,6 +123,14 @@ class ClientData:
         self.contacts = json.loads(enc.decrypt(self.enc_contacts))
 
 
+def validate_and_normalize_email(email):
+    try:
+        valid = validate_email(email)
+        return valid.email
+    except EmailNotValidError as e:
+        print(str(e))
+
+
 class RegisteredUsers:
     users = dict()
     filename: str
@@ -141,10 +151,13 @@ class RegisteredUsers:
             json.dump(self.make_dict(), f)
 
     def register_new_user(self, name, email, password):
-        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        valid_email = validate_and_normalize_email(email)
+        if valid_email is None:
+            return "Invalid Email Address."
+        email_hash = hashlib.sha256((valid_email.encode())).hexdigest()
         if email_hash in self.users:
             return "User already exists."
-        self.users[email_hash] = ClientData(name=name, email=email, password=password, contacts=dict())
+        self.users[email_hash] = ClientData(name=name, email=valid_email, password=password, contacts=dict())
         self.write_json()
         print("User Registered.")
         return ""
@@ -166,8 +179,11 @@ class RegisteredUsers:
         return ""
 
     def add_contact(self, email, contact_name, contact_email):
-        if not contact_email or not contact_name:
-            return "Invalid email or contact."
+        valid_email = validate_and_normalize_email(email)
+        if valid_email is None:
+            return "Invalid Email Address."
+        if not contact_name:
+            return "Invalid contact name."
 
         email_hash = hashlib.sha256((email.encode())).hexdigest()
         user = self.users[email_hash]
