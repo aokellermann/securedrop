@@ -177,7 +177,7 @@ class Client(ClientBase):
                 email = jdict[0]
 
                 await self.write(bytes(ListContactsPackets(email)))
-                contact_dict = ListContactsPacketsResponse(data=(await self.read())[4:]).message
+                contact_dict = ListContactsPacketsResponse(data=(await self.read())[4:]).contacts
 
                 print("Contacts dictionary: ",  contact_dict)
 
