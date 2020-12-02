@@ -179,11 +179,8 @@ class RegisteredUsers:
         self.write_json()
         return ""
 
-    def list_contacts(self, email):
-        print("List contacts in registered users class")
-        if not email:
-            return "invalid email"
-        email_hash = hashlib.sha256((email.encode())).hexdigest()
+    def list_contacts(self):
+        email_hash = list(self.users.keys())[0]
         user = self.users[email_hash]
         print(user.contacts)
         return user.contacts
@@ -210,13 +207,13 @@ class Server(ServerBase):
         elif prefix == ADD_CONTACT_PACKETS_NAME:
             await self.add_contact(AddContactPackets(data=data), stream)
         elif prefix == LIST_CONTACTS_PACKETS_NAME:
-            await self.list_contacts(ListContactsPackets(data=data), stream)
+            await self.list_contacts(stream)
 
     async def write_status(self, stream, msg):
         await self.write(stream, bytes(StatusPackets(msg)))
 
-    async def write_list_contacts_response(self, stream, msg):
-        await self.write(stream, bytes(ListContactsPacketsResponse(msg)))
+    async def write_list_contacts_response(self, stream, contacts_dict):
+        await self.write(stream, bytes(ListContactsPacketsResponse(contacts_dict)))
 
     async def process_register(self, reg, stream):
         msg = self.users.register_new_user(reg.name, reg.email, reg.password)
@@ -236,9 +233,9 @@ class Server(ServerBase):
         msg = self.users.add_contact(self.sock_to_email[stream], addc.name, addc.email)
         await self.write_status(stream, msg)
 
-    async def list_contacts(self, lstc, stream):
-        msg = self.users.list_contacts(lstc.email)
-        await self.write_list_contacts_response(stream, msg)
+    async def list_contacts(self, stream):
+        contacts_dict = self.users.list_contacts()
+        await self.write_list_contacts_response(stream, contacts_dict)
 
 class ServerDriver:
     def __init__(self, port=None, filename=None):
