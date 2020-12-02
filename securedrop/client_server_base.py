@@ -76,7 +76,7 @@ class ServerBase(TCPServer):
             IOLoop.current().add_callback(IOLoop.current().stop)
 
     async def handle_stream(self, stream, address):
-        print("Server accepted connection")
+        print("Server accepted connection at host ", address)
         await stream.wait_for_handshake()
         while True:
             try:
@@ -84,12 +84,16 @@ class ServerBase(TCPServer):
                 print("Server read bytes: ", data[:80])
                 await self.on_data_received(data, stream)
             except StreamClosedError:
-                print("Server lost client at host ", address[0])
+                print("Server lost client at host ", address)
+                await self.on_stream_closed(stream)
                 break
             except Exception as e:
                 print("Server caught exception: ", e)
 
     async def on_data_received(self, data, stream):
+        pass
+
+    async def on_stream_closed(self, address):
         pass
 
     async def write(self, stream, data: bytes):
