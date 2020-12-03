@@ -179,17 +179,17 @@ class RegisteredUsers:
         return ""
 
     def add_contact(self, email, contact_name, contact_email):
-        valid_email = validate_and_normalize_email(email)
-        if not valid_email:
+        valid_contact_email = validate_and_normalize_email(contact_email)
+        if not valid_contact_email:
             return "Invalid Email Address."
         if not contact_name:
             return "Invalid contact name."
 
-        email_hash = hashlib.sha256((valid_email.encode())).hexdigest()
+        email_hash = hashlib.sha256((email.encode())).hexdigest()
         user = self.users[email_hash]
         if not user.contacts:
             user.contacts = dict()
-        user.contacts[contact_email] = contact_name
+        user.contacts[valid_contact_email] = contact_name
         self.write_json()
         return ""
 
