@@ -94,9 +94,8 @@ class TestRegistration(unittest.TestCase):
                             client.main()
 
     def test_aad_initial_registration_succeeds(self):
-        """Ensures that client doesn't throw during some wild, yet valid registrations."""
+        """Ensures that client doesn't throw during some wild, yet valid user registrations."""
         valid_emails = ["simple@example.com", "very.common@example.com",
-                        "disposable.style.email.with+symbol@example.com",
                         "other.email-with-hyphen@example.com",
                         "fully-qualified-domain@example.com",
                         "user.name+tag+sorting@example.com",
@@ -117,7 +116,6 @@ class TestRegistration(unittest.TestCase):
                         client.main()
             os.remove("client.json")
             os.remove("server.json")
-            time.sleep(1)
 
     def test_aada_initial_registration_succeeds(self):
         """Ensures that client doesn't throw during valid registration."""
