@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import unittest
 from unittest.mock import patch
 
@@ -93,6 +94,32 @@ class TestRegistration(unittest.TestCase):
                             client.main()
 
     def test_aad_initial_registration_succeeds(self):
+        """Ensures that client doesn't throw during some wild, yet valid registrations."""
+        valid_emails = ["simple@example.com", "very.common@example.com",
+                        "disposable.style.email.with+symbol@example.com"
+                        "other.email-with-hyphen@example.com",
+                        "fully-qualified-domain@example.com",
+                        "user.name+tag+sorting@example.com",
+                       "x@example.com",
+                        "example-indeed@strange-example.com",
+                        "admin@mailserver1",
+                        "example@s.example",
+                        "\" \"@example.org",
+                        "\"john..doe\"@example.org",
+                        "mailhost!username@example.org"
+                        "user%example.com@example.org"]
+        for i in valid_emails:
+            with server_process():
+                se1 = InputSideEffect(["y", "name_v", i, "exit"])
+                se2 = InputSideEffect(["password_v", "password_v"])
+                with patch('builtins.input', side_effect=se1.se):
+                    with patch('getpass.getpass', side_effect=se2.se):
+                        client.main()
+            os.remove("client.json")
+            os.remove("server.json")
+            time.sleep(1)
+
+    def test_aada_initial_registration_succeeds(self):
         """Ensures that client doesn't throw during valid registration."""
         with server_process():
             se1 = InputSideEffect(["y", "name_v", "email_v@test.com", "exit"])
