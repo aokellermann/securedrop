@@ -68,7 +68,7 @@ def echo_server_process():
 class EchoSingleThread(AsyncTestCase):
     def test_echo(self):
         with echo_server_process():
-            for i in range(1, 3):
+            for i in range(1, 27):
                 with self.subTest(i=i):
                     response = [None]
                     data = os.urandom(2**i + i).replace(b'\n', b'')
