@@ -57,7 +57,7 @@ class Authentication:
 class AESWrapper(object):
     def __init__(self, key):
         self.bs = AES.block_size
-        self.key = Crypto.Util.Padding.pad(key.encode('utf-8'), self.bs)
+        self.key = hashlib.shake_256(key.encode('utf-8')).digest(32)
 
     def encrypt(self, raw):
         raw = Crypto.Util.Padding.pad(raw.encode('utf-8'), self.bs)
@@ -125,7 +125,7 @@ class ClientData:
 
 def validate_and_normalize_email(email):
     try:
-        valid = validate_email(email)
+        valid = validate_email(email, check_deliverability=False)
         return valid.email
     except EmailNotValidError as e:
         print(str(e))
