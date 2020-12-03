@@ -14,6 +14,7 @@ from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListCon
 from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsPacketsResponse
 
 DEFAULT_FILENAME = 'client.json'
+TEST_FILENAME = 'list_contacts_test.json'
 DEFAULT_HOSTNAME = '127.0.0.1'
 DEFAULT_PORT = 6969
 
@@ -172,12 +173,11 @@ class Client(ClientBase):
     async def list_contacts(self):
         msg = ""
         try:
-            with open(DEFAULT_FILENAME, 'r') as f:
-                jdict = json.load(f)
-                email = jdict[0]
+            with open(TEST_FILENAME, 'w') as f:
 
-                await self.write(bytes(ListContactsPackets(email)))
+                await self.write(bytes(ListContactsPackets()))
                 contact_dict = ListContactsPacketsResponse(data=(await self.read())[4:]).contacts
+                json.dump(contact_dict, f)
 
                 print("Contacts dictionary: ",  contact_dict)
 

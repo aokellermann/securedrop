@@ -182,7 +182,6 @@ class RegisteredUsers:
     def list_contacts(self):
         email_hash = list(self.users.keys())[0]
         user = self.users[email_hash]
-        print(user.contacts)
         return user.contacts
 
 

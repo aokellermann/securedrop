@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import securedrop.client as client
+from securedrop.client import TEST_FILENAME
 from securedrop.server import ServerDriver, Server, DEFAULT_filename, AESWrapper
 import json
 import time
@@ -183,9 +184,15 @@ class TestRegistration(unittest.TestCase):
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
-                    with open(DEFAULT_filename, 'r') as f:
-                        self.assertEqual(1, 1)
-
+                    with open(TEST_FILENAME, 'r') as f:
+                        jdict = json.load(f)
+                        # maybe encrypt dictionary to get around compromising information problem
+                        self.assertEqual("name_v_2", jdict["email_v_2"])
+                        self.assertEqual("name_v_3", jdict["email_v_3"])
+                        key_1 = list(jdict.keys())[0]
+                        key_2 = list(jdict.keys())[1]
+                        self.assertEqual("email_v_2", key_1)
+                        self.assertEqual("email_v_3", key_2)
 
 
     def test_aal_login_correct_password_decrypt_contact(self):
