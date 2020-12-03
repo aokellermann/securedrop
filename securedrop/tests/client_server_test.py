@@ -96,17 +96,18 @@ class TestRegistration(unittest.TestCase):
     def test_aad_initial_registration_succeeds(self):
         """Ensures that client doesn't throw during some wild, yet valid user registrations."""
         valid_emails = ["simple@example.com", "very.common@example.com",
-                        "other.email-with-hyphen@example.com",
-                        "fully-qualified-domain@example.com",
-                        "user.name+tag+sorting@example.com",
                         "x@example.com",
-                        "example-indeed@strange-example.com",
                         "admin@mailserver1",
                         "example@s.example",
                         "\" \"@example.org",
                         "\"john..doe\"@example.org",
+                        "user%example.com@example.org",
                         "mailhost!username@example.org",
-                        "user%example.com@example.org"]
+                        "user.name+tag+sorting@example.com",
+                        "fully-qualified-domain@example.com",
+                        "example-indeed@strange-example.com",
+                        "other.email-with-hyphen@example.com"
+                        ]
         for i in valid_emails:
             with server_process():
                 se1 = InputSideEffect(["y", "name_v", i, "exit"])

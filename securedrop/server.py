@@ -57,7 +57,7 @@ class Authentication:
 class AESWrapper(object):
     def __init__(self, key):
         self.bs = AES.block_size
-        self.key = Crypto.Util.Padding.pad(key.encode('utf-8'), self.bs * 2)
+        self.key = Crypto.Util.Padding.pad(key.encode('utf-8'), self.bs)
 
     def encrypt(self, raw):
         raw = Crypto.Util.Padding.pad(raw.encode('utf-8'), self.bs)
