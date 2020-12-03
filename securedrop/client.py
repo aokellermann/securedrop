@@ -172,7 +172,7 @@ class Client(ClientBase):
     async def list_contacts(self):
         msg = ""
         try:
-            with open(sd_filename, 'r') as f:
+            with open(DEFAULT_FILENAME, 'r') as f:
                 jdict = json.load(f)
                 email = jdict[0]
 
