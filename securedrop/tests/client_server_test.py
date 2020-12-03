@@ -102,7 +102,8 @@ class TestRegistration(unittest.TestCase):
                         "er.name+tag+sorting@example.com",
                         "fully-qualified-domain@example.com",
                         "example-indeed@strange-example.com",
-                        "other.email-with-hyphen@example.com"
+                        "other.email-with-hyphen@example.com",
+                        "EXTREMELYLONGEMAIL12345678901234567890123456789012345678901234+x@example.com"
                         ]
         with server_process():
             for i in valid_emails:
