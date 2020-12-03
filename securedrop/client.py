@@ -177,9 +177,12 @@ class Client(ClientBase):
 
                 await self.write(bytes(ListContactsPackets()))
                 contact_dict = ListContactsPacketsResponse(data=(await self.read())[4:]).contacts
+                contacts_keys = list(contact_dict.keys())
                 json.dump(contact_dict, f)
+                print("Contacts dictionary: ", contact_dict)
 
-                print("Contacts dictionary: ",  contact_dict)
+                for i in range(len(contacts_keys)):
+                    print(contacts_keys[i] + " " + contact_dict[contacts_keys[i]])
 
         except RuntimeError as e:
             msg = str(e)

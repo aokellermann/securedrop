@@ -176,7 +176,7 @@ class TestRegistration(unittest.TestCase):
                         self.assertEqual("name_v_2", contacts["email_v_2"])
                         self.assertEqual("name_v_3", contacts["email_v_3"])
 
-    def test_list_contacts(self):
+    def test_aal_list_contacts(self):
         """Ensures that client lists valid contacts successfully."""
         with server_process():
             se1 = InputSideEffect(["email_v", "add", "name_v_2", "email_v_2", "list", "name_v_3", "email_v_3", "exit"])
@@ -195,7 +195,7 @@ class TestRegistration(unittest.TestCase):
                         self.assertEqual("email_v_3", key_2)
 
 
-    def test_aal_login_correct_password_decrypt_contact(self):
+    def test_aam_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
         server = Server(DEFAULT_filename)
         user = server.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
@@ -206,7 +206,7 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(user.contacts["email_v_2"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3"], "name_v_3")
 
-    def test_aam_data_in_memory_after_decrypt(self):
+    def test_aan_data_in_memory_after_decrypt(self):
         """Ensures that Client data can be accessed in local memory after decryption"""
         server = Server(DEFAULT_filename)
         user = server.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
@@ -216,7 +216,7 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(user.contacts["email_v_2"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3"], "name_v_3")
 
-    def test_aan_test_decrypt_wrong_password(self):
+    def test_aao_test_decrypt_wrong_password(self):
         """Ensures that client throws an error when decryption is not successful (wrong key)."""
         server = Server(DEFAULT_filename)
         user = server.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
