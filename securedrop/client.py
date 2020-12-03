@@ -144,8 +144,12 @@ class RegisteredUsers:
             auth2 = Authentication(str(pw2), salt)
             if auth1 != auth2:
                 raise RuntimeError("The two entered passwords don't match!")
-
             print("Passwords Match.")
+
+            # enforce password length to min of 12 characters
+            if (len(pw1) < 12):
+                raise RuntimeError("Password is too short! Password must be at least 12 characters")
+
             email_hash = hashlib.sha256((email.encode())).hexdigest()
             self.users[email_hash] = ClientData(name, email, {}, pw1)
             self.write_json()

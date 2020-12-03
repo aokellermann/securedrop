@@ -38,7 +38,7 @@ class TestRegistration(unittest.TestCase):
     def test_aab_initial_ask_to_register_mismatching_passwords(self):
         """Ensures that client throws if the user inputs mismatching passwords during registration."""
         se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
-        se2 = InputSideEffect(["password_v", "password_v_"])
+        se2 = InputSideEffect(["password_v12", "password_v12_"])
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 with self.assertRaises(RuntimeError):
@@ -48,7 +48,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client throws if the user inputs an empty string during registration."""
         for i in range(0, 2):
             for j in range(0, 2):
-                se_lists = [["y", "name_v", "email_v", "exit"], ["password_v", "password_v_"]]
+                se_lists = [["y", "name_v", "email_v", "exit"], ["password_v12", "password_v12_"]]
                 se_lists[i][j + int(i == 0)] = ""
                 se1 = InputSideEffect(se_lists[0])
                 se2 = InputSideEffect(se_lists[1])
@@ -57,10 +57,19 @@ class TestRegistration(unittest.TestCase):
                         with self.assertRaises(RuntimeError):
                             Client(sd_filename).login()
 
-    def test_aad_initial_registration_succeeds(self):
+    def test_aad_initial_ask_to_register_password_too_short(self):
+        """Ensures that client throws if the user inputs a password that is too short during registration."""
+        se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
+        se2 = InputSideEffect(["password_v1", "password_v1"])
+        with patch('builtins.input', side_effect=se1.se):
+            with patch('getpass.getpass', side_effect=se2.se):
+                with self.assertRaises(RuntimeError):
+                    Client(sd_filename).login()
+
+    def test_aae_initial_registration_succeeds(self):
         """Ensures that client doesn't throw during valid registration."""
         se1 = InputSideEffect(["y", "name_v", "email_v", "exit"])
-        se2 = InputSideEffect(["password_v", "password_v"])
+        se2 = InputSideEffect(["password_v12", "password_v12"])
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 Client(sd_filename).login()
@@ -81,18 +90,18 @@ class TestRegistration(unittest.TestCase):
             self.assertTrue(cd.auth.salt)
             self.assertTrue(cd.auth.key)
 
-    def test_aae_initial_json_valid(self):
+    def test_aaf_initial_json_valid(self):
         """Ensures that client serializes to JSON correctly after registration."""
         with open(sd_filename, 'r') as f:
             jdict = json.load(f)
             self.assert_initial_registered_users_dict_is_valid(jdict)
 
-    def test_aaf_initial_load_from_json(self):
+    def test_aag_initial_load_from_json(self):
         """Ensures that client deserializes from JSON correctly."""
         client = Client(sd_filename)
         self.assert_initial_registered_users_is_valid(client.users.users)
 
-    def test_aag_login_unknown_email(self):
+    def test_aah_login_unknown_email(self):
         """Ensures that client throws if trying to login with an invalid email."""
         se1 = InputSideEffect(["email_v_"])
         se2 = InputSideEffect(["password_v"])
@@ -101,7 +110,7 @@ class TestRegistration(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     Client(sd_filename).login()
 
-    def test_aah_login_wrong_password(self):
+    def test_aai_login_wrong_password(self):
         """Ensures that client throws if trying to login with an invalid password."""
         se1 = InputSideEffect(["email_v"])
         se2 = InputSideEffect(["password_v_"])
@@ -110,31 +119,31 @@ class TestRegistration(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     Client(sd_filename).login()
 
-    def test_aai_login_correct_password(self):
+    def test_aaj_login_correct_password(self):
         """Ensures that client logs in successfully with correct email/password."""
         se1 = InputSideEffect(["email_v", "exit"])
-        se2 = InputSideEffect(["password_v"])
+        se2 = InputSideEffect(["password_v12"])
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 Client(sd_filename).login()
 
-    def test_aaj_add_contact_empty_input(self):
+    def test_aak_add_contact_empty_input(self):
         """Ensures that client does not add a new contact if the input is an empty string."""
         for i in range(0, 2):
             se_list = ["email_v", "add", "name_v_2", "email_v_2", "exit"]
             se_list[2 + i] = ""
             se1 = InputSideEffect(se_list)
-            se2 = InputSideEffect(["password_v"])
+            se2 = InputSideEffect(["password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client = Client(sd_filename)
                     client.login()
                     self.assertTrue("email_v_2" not in client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"].contacts)
 
-    def test_aak_add_contact(self):
+    def test_aal_add_contact(self):
         """Ensures that client adds valid contacts successfully."""
         se1 = InputSideEffect(["email_v", "add", "name_v_2", "email_v_2", "add", "name_v_3", "email_v_3", "exit"])
-        se2 = InputSideEffect(["password_v"])
+        se2 = InputSideEffect(["password_v12"])
         with patch('builtins.input', side_effect=se1.se):
             with patch('getpass.getpass', side_effect=se2.se):
                 client = Client(sd_filename)
@@ -143,7 +152,7 @@ class TestRegistration(unittest.TestCase):
                 self.assertEqual(user.contacts["email_v_2"], "name_v_2")
                 self.assertEqual(user.contacts["email_v_3"], "name_v_3")
 
-    def test_aal_login_correct_password_decrypt_contact(self):
+    def test_aam_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
         client = Client(sd_filename)
         user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
@@ -154,7 +163,7 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(user.contacts["email_v_2"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3"], "name_v_3")
 
-    def test_aam_data_in_memory_after_decrypt(self):
+    def test_aan_data_in_memory_after_decrypt(self):
         """Ensures that Client data can be accessed in local memory after decryption"""
         client = Client(sd_filename)
         user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
@@ -164,7 +173,7 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(user.contacts["email_v_2"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3"], "name_v_3")
 
-    def test_aan_test_decrypt_wrong_password(self):
+    def test_aao_test_decrypt_wrong_password(self):
         """Ensures that client throws an error when decryption is not successful (wrong key)."""
         client = Client(sd_filename)
         user = client.users.users["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
