@@ -1,136 +1,37 @@
+#!/usr/bin/env python3
+
 import json
 import getpass
 import os
 import hashlib
-import base64
-import Crypto.Util.Padding
 
-from Crypto.Random import get_random_bytes
-from Crypto.Cipher import AES
+from securedrop.client_server_base import ClientBase
+from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
+from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
+from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
+from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 
-
-def make_salt():
-    return get_random_bytes(32)
-
-
-class Authentication:
-    salt: bytes
-    key: bytes
-
-    def __init__(self, key=None, salt=None, jdict=None):
-        if key is None and jdict is None:
-            raise RuntimeError("Either a key or a jdict must be provided")
-
-        if salt is None:
-            salt = os.urandom(32)
-
-        if jdict is not None:
-            salt, key = base64.b64decode(jdict["salt"]), base64.b64decode(jdict["key"])
-        elif key is not None:
-            key = hashlib.pbkdf2_hmac('sha512', key.encode('utf-8'), salt, 10000)
-
-        self.salt, self.key = salt, key
-
-    def __eq__(self, other):
-        return self.salt == other.salt and self.key == other.key
-
-    def make_dict(self):
-        return {
-            "salt": base64.b64encode(self.salt).decode('utf-8'),
-            "key": base64.b64encode(self.key).decode('utf-8')
-        }
-
-
-class AESWrapper(object):
-
-    def __init__(self, key):
-        self.bs = AES.block_size
-        self.key = Crypto.Util.Padding.pad(key.encode('utf-8'), self.bs)
-
-    def encrypt(self, raw):
-        raw = Crypto.Util.Padding.pad(raw.encode('utf-8'), self.bs)
-        iv = get_random_bytes(AES.block_size)
-        cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        bytes_ = base64.b64encode(iv + cipher.encrypt(raw))
-        return bytes_.decode('utf-8')
-
-    def decrypt(self, enc):
-        try:
-            data = base64.b64decode(enc)
-            iv = data[:AES.block_size]
-            cipher = AES.new(self.key, AES.MODE_CBC, iv)
-            result = Crypto.Util.Padding.unpad(cipher.decrypt(data[AES.block_size:]), self.bs).decode('utf-8')
-            return result
-        except ValueError or KeyError:
-            raise RuntimeError("Decryption was not successful, could not verify input")
-
-
-class ClientData:
-    name: str
-    email: str
-    contacts: dict
-    auth: Authentication
-    email_hash: str
-    enc_name: str
-    enc_contacts: str
-
-    def __init__(self, nm=None, em=None, cs=None, password=None, jdict=None):
-        if jdict is not None:
-            self.enc_name, self.email_hash, self.enc_contacts, self.auth = \
-                jdict["name"], jdict["email"], jdict["contacts"], Authentication(jdict=jdict["auth"])
-        else:
-            self.name, self.email, self.contacts, self.auth = nm, em, cs, Authentication(password)
-            self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
-
-    def __eq__(self, other):
-        return self.name == other.name
-
-    def make_dict(self):
-        self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
-        self.encrypt_name_contacts()
-        return {
-            "name": self.enc_name,
-            "email": self.email_hash,
-            "contacts": self.enc_contacts,
-            "auth": self.auth.make_dict()
-        }
-
-    def encrypt_name_contacts(self):
-        if self.email is None:
-            raise RuntimeError("Encrypt: A email/key must be provided")
-        enc = AESWrapper(self.email)
-        self.enc_name = enc.encrypt(self.name)
-        dump = json.dumps(self.contacts)
-        self.enc_contacts = enc.encrypt(dump)
-
-    def decrypt_name_contacts(self):
-        if self.email is None:
-            raise RuntimeError("Decrypt: A email/key must be provided")
-        enc = AESWrapper(self.email)
-        self.name = enc.decrypt(self.enc_name)
-        self.contacts = json.loads(enc.decrypt(self.enc_contacts))
+DEFAULT_FILENAME = 'client.json'
+DEFAULT_HOSTNAME = '127.0.0.1'
+DEFAULT_PORT = 6969
 
 
 class RegisteredUsers:
-    users = dict()
-    filename: str
-
     def __init__(self, filename):
         self.filename = filename
-        if os.path.exists(filename):
-            with open(filename, 'r') as f:
-                jdict = json.load(f)
-                for email, cd in jdict.items():
-                    self.users[email] = ClientData(jdict=cd)
+        self.users = set()
+        if os.path.exists(self.filename):
+            with open(self.filename, 'r') as f:
+                self.users = set(json.load(f))
 
-    def make_dict(self):
-        return {email: data.make_dict() for email, data in self.users.items()}
+    def make_json(self):
+        return list(self.users)
 
     def write_json(self):
         with open(self.filename, 'w') as f:
-            json.dump(self.make_dict(), f)
+            json.dump(self.make_json(), f)
 
-    def register_new_user(self):
+    def register_prompt(self):
         name = input("Enter Full Name: ")
         email = input("Enter Email Address: ")
         if email in self.users:
@@ -138,88 +39,145 @@ class RegisteredUsers:
 
         pw1 = getpass.getpass(prompt="Enter Password: ")
         pw2 = getpass.getpass(prompt="Re-enter password: ")
-        if name and email and pw1 and pw2:
-            salt = make_salt()
-            auth1 = Authentication(str(pw1), salt)
-            auth2 = Authentication(str(pw2), salt)
-            if auth1 != auth2:
-                raise RuntimeError("The two entered passwords don't match!")
-            print("Passwords Match.")
+        if pw1 != pw2:
+            raise RuntimeError("The two entered passwords don't match!")
 
-            # enforce password length to min of 12 characters
-            if (len(pw1) < 12):
-                raise RuntimeError("Password is too short! Password must be at least 12 characters")
+        # enforce password length to min of 12 characters
+        if len(pw1) < 12:
+            raise RuntimeError("Password is too short! Password must be at least 12 characters")
 
-            email_hash = hashlib.sha256((email.encode())).hexdigest()
-            self.users[email_hash] = ClientData(name, email, {}, pw1)
-            self.write_json()
-            print("User Registered.")
-            return self.users[email_hash]
-        else:
-            raise RuntimeError("Invalid input")
+        if not name or not email or not pw1:
+            raise RuntimeError("Empty input")
+
+        return name, email, pw1
+
+    def register_user(self, email):
+        self.users.add(email)
+        self.write_json()
+        print("User registered.")
+
+    def login_prompt(self):
+        email = input("Enter Email Address: ")
+        password = getpass.getpass(prompt="Enter Password: ")
+        return email, password
 
 
-class Client:
+class Client(ClientBase):
     users: RegisteredUsers
 
-    def __init__(self, filename):
+    def __init__(self, host: str, prt: int, filename):
+        super().__init__(host, prt)
+        self.filename = filename
         try:
             self.users = RegisteredUsers(filename)
+            self.user = None
         except Exception as e:
             print("Exiting SecureDrop")
             raise e
 
-    def login(self):
-        user = None
-        if not self.users.users:
-            decision = input(
-                "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
-            if str(decision) == 'y':
-                user = self.users.register_new_user()
-            else:
-                raise RuntimeError("You must register a user before using securedrop")
-
+    async def main(self):
+        await super().main()
         try:
-            if not user:
-                email = input("Enter Email Address: ")
-                pw = getpass.getpass(prompt="Enter Password: ")
-                email_hash = hashlib.sha256((email.encode())).hexdigest()
-                if email_hash not in self.users.users:
-                    raise RuntimeError("That email address is not registered")
+            if not self.users.users:
+                decision = input(
+                    "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
+                if str(decision) == 'y':
+                    self.user = await self.register()
+                    if self.user:
+                        await self.sh()
+                    else:
+                        raise RuntimeError("Registration failed.")
+                else:
+                    raise RuntimeError("You must register a user before using securedrop")
+            else:
+                self.user = await self.login()
+                if self.user:
+                    await self.sh()
+                else:
+                    raise RuntimeError("Login failed.")
+        except Exception as e:
+            print("Exiting SecureDrop")
+            raise e
 
-                user = self.users.users[email_hash]
-                auth = Authentication(str(pw), user.auth.salt)
-                if auth != self.users.users[email_hash].auth:
-                    raise RuntimeError("Email and Password Combination Invalid.")
-                user.email = email
-                user.decrypt_name_contacts()
+    async def register(self):
+        msg, email = None, None
+        try:
+            name, email, pw = self.users.register_prompt()
+            await self.write(bytes(RegisterPackets(name, email, pw)))
+            msg = StatusPackets(data=(await self.read())[4:]).message
+            if msg != "":
+                raise RuntimeError(msg)
+            self.users.register_user(email)
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to register: ", msg)
+            return None
+        return email
+
+    async def login(self):
+        msg, email = None, None
+        try:
+            email, pw = self.users.login_prompt()
+            await self.write(bytes(LoginPackets(email, pw)))
+            msg = StatusPackets(data=(await self.read())[4:]).message
+            if msg != "":
+                raise RuntimeError(msg)
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to login: ", msg)
+            return None
+        return email
+
+    async def sh(self):
+        try:
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
             while True:
-                command = input("secure_drop> ")
-                if command == "help":
+                cmd = input("secure_drop> ")
+                if cmd == "help":
                     print("\"add\"  \t-> Add a new contact")
                     print("\"list\"  \t-> List all online contacts")
                     print("\"send\"  \t-> Transfer file to contact")
                     print("\"exit\"  \t-> Exit SecureDrop")
-                elif command == "add":
-                    name = input("Enter Full Name: ")
-                    email = input("Enter Email Address: ")
-                    if name and email:
-                        user.contacts[email] = name
-                        self.users.write_json()
-                    else:
-                        print("Name and email must both be non-empty.")
+                elif cmd == "add":
+                    await self.add_contact()
+                elif cmd == "list":
                     pass
-                elif command == "list":
+                elif cmd == "send":
                     pass
-                elif command == "send":
-                    pass
-                elif command == "exit":
+                elif cmd == "exit":
                     break
 
         except Exception as e:
             print("Exiting SecureDrop")
             raise e
-        else:
-            print("Exiting SecureDrop")
+
+    async def add_contact(self):
+        msg = None
+        try:
+            name = input("Enter Full Name: ")
+            email = input("Enter Email Address: ")
+            if not name or not email:
+                raise RuntimeError("Empty input.")
+
+            await self.write(bytes(AddContactPackets(name, email)))
+            msg = StatusPackets(data=(await self.read())[4:]).message
+            if msg != "":
+                raise RuntimeError(msg)
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to add contact: ", msg)
+
+
+def main(hostname=None, port=None, filename=None):
+    hostname = hostname if hostname is not None else DEFAULT_HOSTNAME
+    port = port if port is not None else DEFAULT_PORT
+    filename = filename if filename is not None else DEFAULT_FILENAME
+    Client(hostname, port, filename).run()
+
+
+if __name__ == "__main__":
+    main()
