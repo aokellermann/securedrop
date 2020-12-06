@@ -57,7 +57,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client throws if the user inputs mismatching passwords during registration."""
         with server_process():
             se1 = InputSideEffect(["y", "name_v", "email_v@test.com", "exit"])
-            se2 = InputSideEffect(["password_v", "password_v_"])
+            se2 = InputSideEffect(["password_v12", "password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     with self.assertRaises(RuntimeError):
@@ -68,7 +68,7 @@ class TestRegistration(unittest.TestCase):
         with server_process():
             for i in range(0, 2):
                 for j in range(0, 2):
-                    se_lists = [["y", "name_v", "email_v@test.com", "exit"], ["password_v", "password_v_"]]
+                    se_lists = [["y", "name_v", "email_v@test.com", "exit"], ["password_v12", "password_v12"]]
                     se_lists[i][j + int(i == 0)] = ""
                     se1 = InputSideEffect(se_lists[0])
                     se2 = InputSideEffect(se_lists[1])
@@ -87,7 +87,7 @@ class TestRegistration(unittest.TestCase):
                              "i_like_underscore@but_its_not_allow_in_this_part.example.com"]
             for i in invald_emails:
                 se1 = InputSideEffect(["y", "name_v", i, "exit"])
-                se2 = InputSideEffect(["password_v", "password_v"])
+                se2 = InputSideEffect(["password_v12", "password_v12"])
                 with patch('builtins.input', side_effect=se1.se):
                     with self.assertRaises(RuntimeError):
                         with patch('getpass.getpass', side_effect=se2.se):
@@ -108,7 +108,7 @@ class TestRegistration(unittest.TestCase):
         with server_process():
             for i in valid_emails:
                 se1 = InputSideEffect(["y", "name_v", i, "exit"])
-                se2 = InputSideEffect(["password_v", "password_v"])
+                se2 = InputSideEffect(["password_v12", "password_v12"])
                 with patch('builtins.input', side_effect=se1.se):
                     with patch('getpass.getpass', side_effect=se2.se):
                         client.main()
@@ -119,7 +119,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client doesn't throw during valid registration."""
         with server_process():
             se1 = InputSideEffect(["y", "name_v", "email_v@test.com", "exit"])
-            se2 = InputSideEffect(["password_v", "password_v"])
+            se2 = InputSideEffect(["password_v12", "password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
@@ -155,7 +155,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client throws if trying to login with an unknown email."""
         with server_process():
             se1 = InputSideEffect(["email_v_@test.com"])
-            se2 = InputSideEffect(["password_v"])
+            se2 = InputSideEffect(["password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     with self.assertRaises(RuntimeError):
@@ -165,7 +165,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client throws if trying to login with an incorrect password."""
         with server_process():
             se1 = InputSideEffect(["email_v@test.com"])
-            se2 = InputSideEffect(["password_v_"])
+            se2 = InputSideEffect(["password_v12_"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     with self.assertRaises(RuntimeError):
@@ -175,7 +175,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client logs in successfully with correct email/password."""
         with server_process():
             se1 = InputSideEffect(["email_v@test.com", "exit"])
-            se2 = InputSideEffect(["password_v"])
+            se2 = InputSideEffect(["password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
@@ -187,7 +187,7 @@ class TestRegistration(unittest.TestCase):
                 se_list = ["email_v@test.com", "add", "name_v_2", "email_v_2@test.com", "exit"]
                 se_list[2 + i] = ""
                 se1 = InputSideEffect(se_list)
-                se2 = InputSideEffect(["password_v"])
+                se2 = InputSideEffect(["password_v12"])
                 with patch('builtins.input', side_effect=se1.se):
                     with patch('getpass.getpass', side_effect=se2.se):
                         client.main()
@@ -210,7 +210,7 @@ class TestRegistration(unittest.TestCase):
                 se_list = ["email_v@test.com", "add", "name_v_2", i, "exit"]
                 se_list[3] = i
                 se1 = InputSideEffect(se_list)
-                se2 = InputSideEffect(["password_v"])
+                se2 = InputSideEffect(["password_v12"])
                 with patch('builtins.input', side_effect=se1.se):
                     with patch('getpass.getpass', side_effect=se2.se):
                         client.main()
@@ -227,7 +227,7 @@ class TestRegistration(unittest.TestCase):
             se1 = InputSideEffect(
                 ["email_v@test.com", "add", "name_v_2", "email_v_2@test.com", "add", "name_v_3", "email_v_3@test.com",
                  "exit"])
-            se2 = InputSideEffect(["password_v"])
+            se2 = InputSideEffect(["password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()

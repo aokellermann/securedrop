@@ -215,6 +215,14 @@ class Server(ServerBase):
         elif prefix == ADD_CONTACT_PACKETS_NAME:
             await self.add_contact(AddContactPackets(data=data), stream)
 
+    async def on_stream_closed(self, stream):
+        if stream not in self.sock_to_email:
+            return
+        email = self.sock_to_email[stream]
+        del self.sock_to_email[stream]
+        del self.email_to_sock[email]
+        print("removed ", email, " from online connections")
+
     async def write_status(self, stream, msg):
         await self.write(stream, bytes(StatusPackets(msg)))
 
@@ -223,6 +231,7 @@ class Server(ServerBase):
         if msg == "":
             self.email_to_sock[reg.email] = stream
             self.sock_to_email[stream] = reg.email
+            print("added ", reg.email, " to online connections")
         await self.write_status(stream, msg)
 
     async def process_login(self, log, stream):
@@ -230,6 +239,7 @@ class Server(ServerBase):
         if msg == "":
             self.email_to_sock[log.email] = stream
             self.sock_to_email[stream] = log.email
+            print("added ", log.email, " to online connections")
         await self.write_status(stream, msg)
 
     async def add_contact(self, addc, stream):
