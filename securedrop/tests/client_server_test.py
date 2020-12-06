@@ -57,7 +57,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client throws if the user inputs mismatching passwords during registration."""
         with server_process():
             se1 = InputSideEffect(["y", "name_v", "email_v@test.com", "exit"])
-            se2 = InputSideEffect(["password_v12", "password_v12"])
+            se2 = InputSideEffect(["password_v12", "password_v12_"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     with self.assertRaises(RuntimeError):
