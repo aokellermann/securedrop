@@ -127,7 +127,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client throws if trying to login with an invalid email."""
         with server_process():
             se1 = InputSideEffect(["email_v_"])
-            se2 = InputSideEffect(["password_v"])
+            se2 = InputSideEffect(["password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     with self.assertRaises(RuntimeError):
@@ -190,7 +190,7 @@ class TestRegistration(unittest.TestCase):
         """Ensures that client lists valid contacts successfully."""
         with server_process():
             se1 = InputSideEffect(["email_v", "list", "exit"])
-            se2 = InputSideEffect(["password_v"])
+            se2 = InputSideEffect(["password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
