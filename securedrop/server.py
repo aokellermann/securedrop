@@ -273,6 +273,7 @@ class Server(ServerBase):
 
         await self.write_list_contacts_response(stream, contacts_dict_send)
 
+
 class ServerDriver:
     def __init__(self, port=None, filename=None):
         port = port if port is not None else DEFAULT_PORT

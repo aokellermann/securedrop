@@ -176,23 +176,18 @@ class TestRegistration(unittest.TestCase):
                         self.assertEqual("name_v_2", contacts["email_v_2"])
                         self.assertEqual("name_v_3", contacts["email_v_3"])
 
-    def test_aal_list_contacts(self):
+    def test_aal_list_contacts_empty_dictionary(self):
         """Ensures that client lists valid contacts successfully."""
         with server_process():
-            se1 = InputSideEffect(["email_v", "add", "name_v_2", "email_v_2", "list", "name_v_3", "email_v_3", "exit"])
+            se1 = InputSideEffect(["email_v", "list", "exit"])
             se2 = InputSideEffect(["password_v"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
                     with open(TEST_FILENAME, 'r') as f:
                         jdict = json.load(f)
-                        # maybe encrypt dictionary to get around compromising information problem
-                        self.assertEqual("name_v_2", jdict["email_v_2"])
-                        self.assertEqual("name_v_3", jdict["email_v_3"])
-                        key_1 = list(jdict.keys())[0]
-                        key_2 = list(jdict.keys())[1]
-                        self.assertEqual("email_v_2", key_1)
-                        self.assertEqual("email_v_3", key_2)
+                        is_empty = not bool(jdict)
+                        self.assertEqual(True, is_empty)
 
 
     def test_aam_login_correct_password_decrypt_contact(self):
