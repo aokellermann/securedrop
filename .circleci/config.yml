@@ -9,7 +9,7 @@ jobs:
       - checkout
       - run:
           name: Install required tools
-          command: pacman -Sy --noconfirm base base-devel git python python-json5 python-pycryptodome python-tornado
+          command: pacman -Sy --noconfirm python python-pycryptodome python-tornado
       - run:
           name: Unit Test
           command: ./scripts/test.sh
