@@ -3,7 +3,6 @@
 import os
 import base64
 import json
-import hashlib
 from multiprocessing import shared_memory
 
 from Crypto.Random import get_random_bytes
@@ -41,7 +40,6 @@ class Authentication:
         if jdict is not None:
             salt, key = base64.b64decode(jdict["salt"]), base64.b64decode(jdict["key"])
         elif key is not None:
-            #key = hashlib.pbkdf2_hmac('sha512', key.encode('utf-8'), salt, 10000)
             key = PBKDF2(key.encode('utf-8'), salt, 64, count=10000, hmac_hash_module=SHA512)
 
         self.salt, self.key = salt, key
