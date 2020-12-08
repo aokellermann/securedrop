@@ -80,12 +80,12 @@ class TestRegistration(unittest.TestCase):
     def test_aad_initial_ask_to_register_invalid_email(self):
         """Ensures that client throws if the user inputs invalid email during registration."""
         with server_process():
-            invald_emails = ["Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
+            invalid_emails = ["Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
                              "just\"not\"right@example.com", "this is\"not\\allowed@example.com",
                              "this\\ still\\\"not\\\\allowed@example.com",
                              "1234567890123456789012345678901234567890123456789012345678901234+x@example.com",
                              "i_like_underscore@but_its_not_allow_in_this_part.example.com"]
-            for i in invald_emails:
+            for i in invalid_emails:
                 se1 = InputSideEffect(["y", "name_v", i, "exit"])
                 se2 = InputSideEffect(["password_v12", "password_v12"])
                 with patch('builtins.input', side_effect=se1.se):
