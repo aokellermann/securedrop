@@ -77,7 +77,7 @@ class TestRegistration(unittest.TestCase):
                             with self.assertRaises(RuntimeError):
                                 client.main()
 
-    def test_aad_initial_ask_to_register_invalid_email(self):
+    def test_aad_initial_ask_to_register_invallid_email(self):
         """Ensures that client throws if the user inputs invalid email during registration."""
         with server_process():
             invald_emails = ["Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
@@ -109,7 +109,7 @@ class TestRegistration(unittest.TestCase):
                         "x@example.com",
                         "user%example.com@example.org",
                         "mailhost!username@example.org",
-                        "user.name+tag+sorting@example.com",
+                        "er.name+tag+sorting@example.com",
                         "fully-qualified-domain@example.com",
                         "example-indeed@strange-example.com",
                         "other.email-with-hyphen@example.com",
@@ -122,8 +122,8 @@ class TestRegistration(unittest.TestCase):
                 with patch('builtins.input', side_effect=se1.se):
                     with patch('getpass.getpass', side_effect=se2.se):
                         client.main()
-                        os.remove(client.DEFAULT_FILENAME)
-                        os.remove(DEFAULT_filename)
+                        os.remove("client.json")
+                        os.remove("server.json")
 
     def test_aag_initial_registration_succeeds(self):
         """Ensures that client doesn't throw during valid registration."""
