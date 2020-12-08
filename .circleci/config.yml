@@ -11,5 +11,8 @@ jobs:
           name: Install required tools
           command: apk add --no-cache bash python3 py3-tornado py3-pycryptodome openssl py3-yapf
       - run:
+          name: Formatting
+          command: ./scripts/format.sh check
+      - run:
           name: Unit Test
           command: ./scripts/test.sh
