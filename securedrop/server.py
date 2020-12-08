@@ -58,7 +58,7 @@ class AESWrapper(object):
     def __init__(self, key):
         self.bs = AES.block_size
         shake = SHAKE256.new()
-        shake.update(key)
+        shake.update(key.encode('utf-8'))
         self.key = shake.read(32)
 
     def encrypt(self, raw):
