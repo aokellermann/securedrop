@@ -10,6 +10,7 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_FILENAME = 'client.json'
 DEFAULT_HOSTNAME = '127.0.0.1'
@@ -34,7 +35,10 @@ class RegisteredUsers:
     def register_prompt(self):
         name = input("Enter Full Name: ")
         email = input("Enter Email Address: ")
-        if email in self.users:
+        valid_email = validate_and_normalize_email(email)
+        if valid_email is None:
+            raise RuntimeError("Invalid Email Address.")
+        if valid_email in self.users:
             raise RuntimeError("That email already exists!")
 
         pw1 = getpass.getpass(prompt="Enter Password: ")
@@ -46,10 +50,10 @@ class RegisteredUsers:
         if len(pw1) < 12:
             raise RuntimeError("Password is too short! Password must be at least 12 characters")
 
-        if not name or not email or not pw1:
+        if not name or not valid_email or not pw1:
             raise RuntimeError("Empty input")
 
-        return name, email, pw1
+        return name, valid_email, pw1
 
     def register_user(self, email):
         self.users.add(email)
@@ -159,10 +163,13 @@ class Client(ClientBase):
         try:
             name = input("Enter Full Name: ")
             email = input("Enter Email Address: ")
-            if not name or not email:
-                raise RuntimeError("Empty input.")
+            valid_email = validate_and_normalize_email(email)
+            if valid_email is None:
+                raise RuntimeError("Invalid Email Address.")
+            if not name:
+                raise RuntimeError("Empty name input.")
 
-            await self.write(bytes(AddContactPackets(name, email)))
+            await self.write(bytes(AddContactPackets(name, valid_email)))
             msg = StatusPackets(data=(await self.read())[4:]).message
             if msg != "":
                 raise RuntimeError(msg)

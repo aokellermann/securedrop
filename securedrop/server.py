@@ -17,6 +17,7 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
 DEFAULT_PORT = 6969
@@ -152,10 +153,9 @@ class RegisteredUsers:
             return "Invalid Email Address."
         h = SHA256.new(valid_email.encode())
         email_hash = h.hexdigest()
-
         if email_hash in self.users:
             return "User already exists."
-        self.users[email_hash] = ClientData(name=name, email=email, password=password, contacts=dict())
+        self.users[email_hash] = ClientData(name=name, email=valid_email, password=password, contacts=dict())
         self.write_json()
         print("User Registered.")
         return ""
@@ -178,15 +178,18 @@ class RegisteredUsers:
         return ""
 
     def add_contact(self, email, contact_name, contact_email):
-        if not contact_email or not contact_name:
-            return "Invalid email or contact."
+        valid_contact_email = validate_and_normalize_email(contact_email)
+        if not valid_contact_email:
+            return "Invalid Email Address."
+        if not contact_name:
+            return "Invalid contact name."
 
         h = SHA256.new(email.encode())
         email_hash = h.hexdigest()
         user = self.users[email_hash]
         if not user.contacts:
             user.contacts = dict()
-        user.contacts[contact_email] = contact_name
+        user.contacts[valid_contact_email] = contact_name
         self.write_json()
         return ""
 
