@@ -3,13 +3,13 @@ version: 2
 jobs:
   build:
     docker:
-      - image: alpine
+      - image: alpine:edge
 
     steps:
       - checkout
       - run:
           name: Install required tools
-          command: apk add --no-cache bash python3 py3-tornado py3-pycryptodome openssl
+          command: apk add --no-cache bash python3 py3-tornado py3-pycryptodome openssl py3-yapf
       - run:
           name: Unit Test
           command: ./scripts/test.sh
