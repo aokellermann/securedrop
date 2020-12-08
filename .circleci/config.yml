@@ -9,7 +9,7 @@ jobs:
       - checkout
       - run:
           name: Install required tools
-          command: apk add --no-cache bash python3 py3-tornado py3-pycryptodome openssl
+          command: apk add --no-cache bash python3 py3-tornado py3-pycryptodome py3-validate-email openssl
       - run:
           name: Unit Test
           command: ./scripts/test.sh
