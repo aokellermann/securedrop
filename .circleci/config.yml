@@ -3,13 +3,13 @@ version: 2
 jobs:
   build:
     docker:
-      - image: alpine
+      - image: archlinux
 
     steps:
       - checkout
       - run:
           name: Install required tools
-          command: apk add --no-cache bash python3 py3-tornado py3-pycryptodome openssl
+          command: pacman -Sy --noconfirm base base-devel git python python-json5 python-pycryptodome python-tornado python-email-validator
       - run:
           name: Unit Test
           command: ./scripts/test.sh
