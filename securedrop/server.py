@@ -6,10 +6,9 @@ import hashlib
 import json
 from multiprocessing import shared_memory
 
-from email_validator import validate_email, EmailNotValidError
-
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES
+from Crypto.Hash import SHAKE256
 import Crypto.Util.Padding
 
 from securedrop import ServerBase
@@ -17,6 +16,7 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
 DEFAULT_PORT = 6969
@@ -57,7 +57,9 @@ class Authentication:
 class AESWrapper(object):
     def __init__(self, key):
         self.bs = AES.block_size
-        self.key = hashlib.shake_256(key.encode('utf-8')).digest(32)
+        shake = SHAKE256.new()
+        shake.update(key)
+        self.key = shake.read(32)
 
     def encrypt(self, raw):
         raw = Crypto.Util.Padding.pad(raw.encode('utf-8'), self.bs)
@@ -121,14 +123,6 @@ class ClientData:
         enc = AESWrapper(self.email)
         self.name = enc.decrypt(self.enc_name)
         self.contacts = json.loads(enc.decrypt(self.enc_contacts))
-
-
-def validate_and_normalize_email(email):
-    try:
-        valid = validate_email(email, check_deliverability=False)
-        return valid.email
-    except EmailNotValidError as e:
-        print(str(e))
 
 
 class RegisteredUsers:
