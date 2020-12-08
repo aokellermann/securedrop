@@ -209,11 +209,13 @@ class TestRegistration(unittest.TestCase):
 
     def test_aan_add_contact_invalid_email(self):
         """Ensures that client does not add a new contact if the input is an invalid email."""
-        invalid_emails = ["Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
-                          "just\"not\"right@example.com", "this is\"not\\allowed@example.com",
-                          "this\\ still\\\"not\\\\allowed@example.com",
-                          "1234567890123456789012345678901234567890123456789012345678901234+x@example.com",
-                          "i_like_underscore@but_its_not_allow_in_this_part.example.com"]
+        invalid_emails = [
+            "Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
+            "just\"not\"right@example.com", "this is\"not\\allowed@example.com",
+            "this\\ still\\\"not\\\\allowed@example.com",
+            "1234567890123456789012345678901234567890123456789012345678901234+x@example.com",
+            "i_like_underscore@but_its_not_allow_in_this_part.example.com"
+        ]
         with server_process():
             for i in invalid_emails:
                 se_list = ["email_v@test.com", "add", "name_v_2", i, "exit"]
@@ -234,17 +236,19 @@ class TestRegistration(unittest.TestCase):
     def test_aao_add_contact(self):
         """Ensures that client adds valid contacts successfully."""
         with server_process():
-            se1 = InputSideEffect(
-                ["email_v@test.com", "add", "name_v_2", "email_v_2@test.com", "add", "name_v_3", "email_v_3@test.com",
-                 "exit"])
+            se1 = InputSideEffect([
+                "email_v@test.com", "add", "name_v_2", "email_v_2@test.com", "add", "name_v_3", "email_v_3@test.com",
+                "exit"
+            ])
             se2 = InputSideEffect(["password_v12"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
                     client.main()
                     with open(DEFAULT_filename, 'r') as f:
                         jdict = json.load(f)
-                        contacts = json.loads(AESWrapper("email_v@test.com").decrypt(
-                            jdict["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]["contacts"]))
+                        contacts = json.loads(
+                            AESWrapper("email_v@test.com").decrypt(
+                                jdict["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]["contacts"]))
                         self.assertEqual("name_v_2", contacts["email_v_2@test.com"])
                         self.assertEqual("name_v_3", contacts["email_v_3@test.com"])
 
