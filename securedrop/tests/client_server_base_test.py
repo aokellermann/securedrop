@@ -53,7 +53,10 @@ def echo_server_process():
     sentinel = shared_memory.SharedMemory(create=True, size=1)
     sentinel.buf[0] = 0
     server = EchoServer()
-    process = Process(target=server.run, args=(PORT, sentinel.name,))
+    process = Process(target=server.run, args=(
+        PORT,
+        sentinel.name,
+    ))
     try:
         process.start()
         time.sleep(0.1)
@@ -79,8 +82,11 @@ class EchoSingleThread(AsyncTestCase):
         clients_num = 200
         with echo_server_process():
             sentinel = shared_memory.SharedMemory(create=True, size=clients_num * 8)
-            clients = [AsyncEchoClient(b"data" + i.to_bytes(4, byteorder='little'), sentinel.name, i * 8, i * 8 + 8) for i in range(clients_num)]
-            threads = [Process(target=client.run, args=(30,)) for client in clients]
+            clients = [
+                AsyncEchoClient(b"data" + i.to_bytes(4, byteorder='little'), sentinel.name, i * 8, i * 8 + 8)
+                for i in range(clients_num)
+            ]
+            threads = [Process(target=client.run, args=(30, )) for client in clients]
             for thread in threads:
                 thread.daemon = True
                 thread.start()
