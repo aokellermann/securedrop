@@ -164,9 +164,10 @@ class TestRegistration(unittest.TestCase):
                         client.main()
                         with open(DEFAULT_filename, 'r') as f:
                             jdict = json.load(f)
-                            contacts = json.loads(AESWrapper("email_v")
-                                                  .decrypt(
-                                jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]["contacts"]))
+                            contacts = json.loads(
+                                AESWrapper("email_v").decrypt(
+                                    jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]
+                                    ["contacts"]))
                             self.assertEqual(dict(), contacts)
 
     def test_aak_add_contact(self):
@@ -179,9 +180,9 @@ class TestRegistration(unittest.TestCase):
                     client.main()
                     with open(DEFAULT_filename, 'r') as f:
                         jdict = json.load(f)
-                        contacts = json.loads(AESWrapper("email_v")
-                                              .decrypt(
-                            jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]["contacts"]))
+                        contacts = json.loads(
+                            AESWrapper("email_v").decrypt(
+                                jdict["05c0f2ea8e3967a16d55bc8894d3787a69d3821d327f687863e6492cb74654c3"]["contacts"]))
                         self.assertEqual("name_v_2", contacts["email_v_2"])
                         self.assertEqual("name_v_3", contacts["email_v_3"])
 
