@@ -48,10 +48,7 @@ class Authentication:
         return self.salt == other.salt and self.key == other.key
 
     def make_dict(self):
-        return {
-            "salt": base64.b64encode(self.salt).decode('utf-8'),
-            "key": base64.b64encode(self.key).decode('utf-8')
-        }
+        return {"salt": base64.b64encode(self.salt).decode('utf-8'), "key": base64.b64encode(self.key).decode('utf-8')}
 
 
 class AESWrapper(object):

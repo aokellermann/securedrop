@@ -249,6 +249,7 @@ class TestRegistration(unittest.TestCase):
                         self.assertEqual("name_v_2", contacts["email_v_2@test.com"])
                         self.assertEqual("name_v_3", contacts["email_v_3@test.com"])
 
+
     def test_aap_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
         server = Server(DEFAULT_filename)
