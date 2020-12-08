@@ -80,11 +80,13 @@ class TestRegistration(unittest.TestCase):
     def test_aad_initial_ask_to_register_invalid_email(self):
         """Ensures that client throws if the user inputs invalid email during registration."""
         with server_process():
-            invalid_emails = ["Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
-                             "just\"not\"right@example.com", "this is\"not\\allowed@example.com",
-                             "this\\ still\\\"not\\\\allowed@example.com",
-                             "1234567890123456789012345678901234567890123456789012345678901234+x@example.com",
-                             "i_like_underscore@but_its_not_allow_in_this_part.example.com"]
+            invalid_emails = [
+                "Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
+                "just\"not\"right@example.com", "this is\"not\\allowed@example.com",
+                "this\\ still\\\"not\\\\allowed@example.com",
+                "1234567890123456789012345678901234567890123456789012345678901234+x@example.com",
+                "i_like_underscore@but_its_not_allow_in_this_part.example.com"
+            ]
             for i in invalid_emails:
                 se1 = InputSideEffect(["y", "name_v", i, "exit"])
                 se2 = InputSideEffect(["password_v12", "password_v12"])
@@ -105,16 +107,12 @@ class TestRegistration(unittest.TestCase):
 
     def test_aaf_initial_registration_succeeds(self):
         """Ensures that client doesn't throw during some wild, yet valid user registrations."""
-        valid_emails = ["simple@example.com", "very.common@example.com",
-                        "x@example.com",
-                        "user%example.com@example.org",
-                        "mailhost!username@example.org",
-                        "user.name+tag+sorting@example.com",
-                        "fully-qualified-domain@example.com",
-                        "example-indeed@strange-example.com",
-                        "other.email-with-hyphen@example.com",
-                        "EXTREMELYLONGEMAIL12345678901234567890123456789012345678901234+x@example.com"
-                        ]
+        valid_emails = [
+            "simple@example.com", "very.common@example.com", "x@example.com", "user%example.com@example.org",
+            "mailhost!username@example.org", "user.name+tag+sorting@example.com", "fully-qualified-domain@example.com",
+            "example-indeed@strange-example.com", "other.email-with-hyphen@example.com",
+            "EXTREMELYLONGEMAIL12345678901234567890123456789012345678901234+x@example.com"
+        ]
         with server_process():
             for i in valid_emails:
                 se1 = InputSideEffect(["y", "name_v", i, "exit"])
@@ -203,20 +201,21 @@ class TestRegistration(unittest.TestCase):
                         client.main()
                         with open(DEFAULT_filename, 'r') as f:
                             jdict = json.load(f)
-                            contacts = json.loads(AESWrapper("email_v@test.com")
-                                .decrypt(
-                                jdict["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]["contacts"]))
+                            contacts = json.loads(
+                                AESWrapper("email_v@test.com").decrypt(
+                                    jdict["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]
+                                    ["contacts"]))
                             self.assertEqual(dict(), contacts)
 
     def test_aan_add_contact_invalid_email(self):
         """Ensures that client does not add a new contact if the input is an invalid email."""
-        invald_emails = ["Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
-                         "just\"not\"right@example.com", "this is\"not\\allowed@example.com",
-                         "this\\ still\\\"not\\\\allowed@example.com",
-                         "1234567890123456789012345678901234567890123456789012345678901234+x@example.com",
-                         "i_like_underscore@but_its_not_allow_in_this_part.example.com"]
+        invalid_emails = ["Abc.example.com", "A@b@c@example.com", "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com",
+                          "just\"not\"right@example.com", "this is\"not\\allowed@example.com",
+                          "this\\ still\\\"not\\\\allowed@example.com",
+                          "1234567890123456789012345678901234567890123456789012345678901234+x@example.com",
+                          "i_like_underscore@but_its_not_allow_in_this_part.example.com"]
         with server_process():
-            for i in invald_emails:
+            for i in invalid_emails:
                 se_list = ["email_v@test.com", "add", "name_v_2", i, "exit"]
                 se_list[3] = i
                 se1 = InputSideEffect(se_list)
@@ -226,9 +225,10 @@ class TestRegistration(unittest.TestCase):
                         client.main()
                         with open(DEFAULT_filename, 'r') as f:
                             jdict = json.load(f)
-                            contacts = json.loads(AESWrapper("email_v@test.com")
-                                .decrypt(
-                                jdict["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]["contacts"]))
+                            contacts = json.loads(
+                                AESWrapper("email_v@test.com").decrypt(
+                                    jdict["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]
+                                    ["contacts"]))
                             self.assertEqual(dict(), contacts)
 
     def test_aao_add_contact(self):
@@ -243,12 +243,10 @@ class TestRegistration(unittest.TestCase):
                     client.main()
                     with open(DEFAULT_filename, 'r') as f:
                         jdict = json.load(f)
-                        contacts = json.loads(AESWrapper("email_v@test.com")
-                            .decrypt(
+                        contacts = json.loads(AESWrapper("email_v@test.com").decrypt(
                             jdict["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]["contacts"]))
                         self.assertEqual("name_v_2", contacts["email_v_2@test.com"])
                         self.assertEqual("name_v_3", contacts["email_v_3@test.com"])
-
 
     def test_aap_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
