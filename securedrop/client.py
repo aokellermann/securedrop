@@ -3,7 +3,6 @@
 import json
 import getpass
 import os
-import hashlib
 
 from securedrop.client_server_base import ClientBase
 from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
