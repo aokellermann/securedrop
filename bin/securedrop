@@ -33,4 +33,4 @@ if __name__ == "__main__":
             securedrop_hostname = a
         else:
             assert False, "unhandled option"
-    client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_file)
+    client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_hostname)
