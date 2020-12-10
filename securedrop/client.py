@@ -190,8 +190,7 @@ class Client(ClientBase):
 
     async def check_for_file_transfer_requests(self):
         await self.write(bytes(FileTransferRequestResponsePackets()))
-        file_transfer_requests = FileTransferCheckRequestsPackets(
-            data=(await self.read())[4:]).requests
+        file_transfer_requests = FileTransferCheckRequestsPackets(data=(await self.read())[4:]).requests
 
         if file_transfer_requests:
             print("Incoming file transfer request(s):")

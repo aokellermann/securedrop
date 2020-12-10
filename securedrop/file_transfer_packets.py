@@ -28,11 +28,9 @@ import json
 
 # ****************************************************************
 
-
 # Part 1: P2P Facilitation
 
 # 1. `X -> Y/F -> S`: X wants to send F to Y
-
 
 FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME = b"FTRP"
 
