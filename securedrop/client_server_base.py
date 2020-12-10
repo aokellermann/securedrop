@@ -7,15 +7,18 @@ from tornado.tcpserver import TCPServer
 from multiprocessing import shared_memory
 
 
+MESSAGE_SENTINEL = b"\n" * 16
+
+
 async def read(stream):
-    data = await stream.read_until(b"\n\n")
-    if len(data) >= 2 and data[len(data) - 2:] == b"\n\n":
+    data = await stream.read_until(MESSAGE_SENTINEL)
+    if len(data) >= 2 and data[len(data) - 2:] == MESSAGE_SENTINEL:
         data = data[0:len(data) - 2]
     return data
 
 
 async def write(stream, data: bytes):
-    await stream.write(data + b"\n\n")
+    await stream.write(data + MESSAGE_SENTINEL)
 
 
 class ClientBase:
