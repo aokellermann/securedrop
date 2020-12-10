@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-
+import getopt
 import os
+import sys
 
 from securedrop import client
 
@@ -15,4 +16,22 @@ if __name__ == "__main__":
         if not os.path.exists(securedrop_dir):
             raise RuntimeError("Failed to create securedrop directory: $HOME/.securedrop")
     securedrop_file = os.path.join(securedrop_dir, "client_db.json")
-    client.main(filename=securedrop_file)
+    securedrop_port = None
+    securedrop_hostname = None
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "paf", ["port", "address", "filename"])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err)  # will print something like "option -a not recognized"
+        sys.exit(2)
+    for o, a in opts:
+        if o in ("-p", "--port"):
+            securedrop_port = a
+        elif o in ("-f", "--filename"):
+            securedrop_file = a
+        elif o in ("-a", "--address"):
+            securedrop_hostname = a
+        else:
+            assert False, "unhandled option"
+    client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_file)
