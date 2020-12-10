@@ -17,8 +17,9 @@ if __name__ == "__main__":
             raise RuntimeError("Failed to create securedrop directory: $HOME/.securedrop")
     securedrop_file = os.path.join(securedrop_dir, "server_db.json")
     securedrop_port = None
+    verbose_flag = False
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "pf", ["port", "filename"])
+        opts, args = getopt.getopt(sys.argv[1:], "pfv", ["port", "filename", "verbose"])
     except getopt.GetoptError as err:
         # print help information and exit:
         print(err)  # will print something like "option -a not recognized"
@@ -28,6 +29,8 @@ if __name__ == "__main__":
             securedrop_port = a
         elif o in ("-f", "--filename"):
             securedrop_file = a
+        elif o in ("-v", "--verbose"):
+            verbose_flag = True
         else:
             assert False, "unhandled option"
     server.main(filename=securedrop_file, port=securedrop_port)
