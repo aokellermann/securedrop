@@ -28,7 +28,7 @@ if __name__ == "__main__":
         if o in ("-p", "--port"):
             securedrop_port = a
         elif o in ("-f", "--filename"):
-            securedrop_file = a
+            securedrop_file = os.path.join(securedrop_dir, a)
         elif o in ("-a", "--address"):
             securedrop_hostname = a
         else:
