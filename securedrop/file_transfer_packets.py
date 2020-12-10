@@ -47,7 +47,7 @@ class FileTransferRequestPackets:
         elif recipient_email is not None and file_info is not None:
             self.jdict = {
                 "recipient_email": self.recipient_email,
-                "requests": self.file_info,
+                "file_info": self.file_info,
             }
 
     def __bytes__(self):

@@ -16,6 +16,9 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+from securedrop.file_transfer_packets import FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME, FileTransferRequestPackets, \
+    FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME, FILE_TRANSFER_CHECK_REQUESTS_RESPONSE_PACKETS_NAME, \
+    FileTransferCheckRequestsPackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
@@ -188,6 +191,7 @@ class Server(ServerBase):
         self.users = RegisteredUsers(filename)
         self.email_to_sock = dict()
         self.sock_to_email = dict()
+        self.file_transfer_requests = dict()
         super().__init__()
 
     async def on_data_received(self, data, stream):
@@ -203,6 +207,10 @@ class Server(ServerBase):
             await self.process_login(LoginPackets(data=data), stream)
         elif prefix == ADD_CONTACT_PACKETS_NAME:
             await self.add_contact(AddContactPackets(data=data), stream)
+        elif prefix == FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME:
+            await self.process_file_transfer_request(FileTransferRequestPackets(data=data), stream)
+        elif prefix == FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME:
+            await self.send_active_file_transfer_requests(stream)
 
     async def on_stream_closed(self, stream):
         if stream not in self.sock_to_email:
@@ -234,6 +242,16 @@ class Server(ServerBase):
     async def add_contact(self, addc, stream):
         msg = self.users.add_contact(self.sock_to_email[stream], addc.name, addc.email)
         await self.write_status(stream, msg)
+
+    async def process_file_transfer_request(self, ftrp, stream):
+        if ftrp.recipient_email not in self.file_transfer_requests:
+            self.file_transfer_requests[ftrp.recipient_email] = dict()
+        self.file_transfer_requests[ftrp.recipient_email][self.sock_to_email[stream]] = ftrp.file_info
+
+    async def send_active_file_transfer_requests(self, stream):
+        email = self.sock_to_email[stream]
+        requests = self.file_transfer_requests[email] if email in self.file_transfer_requests else dict()
+        await self.write(stream, bytes(FileTransferCheckRequestsPackets(requests)))
 
 
 class ServerDriver:

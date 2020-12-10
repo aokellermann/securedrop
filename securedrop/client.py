@@ -3,13 +3,20 @@
 import json
 import getpass
 import os
+import select
+import sys
+import time
+
+from threading import Thread, Lock
 
 from securedrop.client_server_base import ClientBase
 from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
-from securedrop.utils import validate_and_normalize_email
+from securedrop.file_transfer_packets import FileTransferRequestPackets, FileTransferRequestResponsePackets, \
+    FileTransferCheckRequestsPackets
+from securedrop.utils import validate_and_normalize_email, sha256_file, sizeof_fmt
 
 DEFAULT_FILENAME = 'client.json'
 DEFAULT_HOSTNAME = '127.0.0.1'
@@ -138,20 +145,24 @@ class Client(ClientBase):
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
             while True:
-                cmd = input("secure_drop> ")
-                if cmd == "help":
-                    print("\"add\"  \t-> Add a new contact")
-                    print("\"list\"  \t-> List all online contacts")
-                    print("\"send\"  \t-> Transfer file to contact")
-                    print("\"exit\"  \t-> Exit SecureDrop")
-                elif cmd == "add":
-                    await self.add_contact()
-                elif cmd == "list":
-                    pass
-                elif cmd == "send":
-                    pass
-                elif cmd == "exit":
-                    break
+                print("secure_drop> ", end="")
+                if select.select([sys.stdin], [], [], 5)[0]:
+                    cmd = input()
+                    if cmd == "help":
+                        print("\"add\"  \t-> Add a new contact")
+                        print("\"list\"  \t-> List all online contacts")
+                        print("\"send\"  \t-> Transfer file to contact")
+                        print("\"exit\"  \t-> Exit SecureDrop")
+                    elif cmd == "add":
+                        await self.add_contact()
+                    elif cmd == "list":
+                        pass
+                    elif cmd == "send":
+                        await self.send_file()
+                    elif cmd == "exit":
+                        break
+
+                await self.check_for_file_transfer_requests()
 
         except Exception as e:
             print("Exiting SecureDrop")
@@ -169,6 +180,58 @@ class Client(ClientBase):
                 raise RuntimeError("Empty name input.")
 
             await self.write(bytes(AddContactPackets(name, valid_email)))
+            msg = StatusPackets(data=(await self.read())[4:]).message
+            if msg != "":
+                raise RuntimeError(msg)
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to add contact: ", msg)
+
+    async def check_for_file_transfer_requests(self):
+        await self.write(bytes(FileTransferRequestResponsePackets()))
+        file_transfer_requests = FileTransferCheckRequestsPackets(
+            data=(await self.read())[4:]).requests
+
+        if file_transfer_requests:
+            print("Incoming file transfer request(s):")
+            i = 1
+            for email, file_info in file_transfer_requests.items():
+                print("\t{}. {}".format(i, email))
+                print("\t\tname: ", file_info["name"])
+                print("\t\tsize: ", sizeof_fmt(int(file_info["size"])))
+                print("\t\tSHA256: ", file_info["SHA256"])
+                i += 1
+
+            print()
+            selection = input("Enter the number for which request you'd like to accept, or 0 to deny all: ")
+            try:
+                selection_num = int(selection)
+                if selection_num <= 0 or selection_num > i:
+                    raise ValueError
+            except ValueError:
+                pass
+
+    async def send_file(self):
+        msg = None
+        try:
+            recipient_email = input("Enter the recipient's email address: ")
+            file_path = os.path.abspath(input("Enter the file path: "))
+            valid_email = validate_and_normalize_email(recipient_email)
+            if valid_email is None:
+                raise RuntimeError("Invalid Email Address.")
+            if not file_path:
+                raise RuntimeError("Empty file path.")
+            if not os.path.exists(file_path):
+                raise RuntimeError("Cannot find file: {}".format(file_path))
+
+            file_info = {
+                "name": os.path.basename(file_path),
+                "size": os.path.getsize(file_path),
+                "SHA256": sha256_file(file_path),
+            }
+
+            await self.write(bytes(FileTransferRequestPackets(valid_email, file_info)))
             msg = StatusPackets(data=(await self.read())[4:]).message
             if msg != "":
                 raise RuntimeError(msg)
