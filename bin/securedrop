@@ -18,7 +18,6 @@ if __name__ == "__main__":
     securedrop_file = os.path.join(securedrop_dir, "client_db.json")
     securedrop_port = None
     securedrop_hostname = None
-
     try:
         opts, args = getopt.getopt(sys.argv[1:], "paf", ["port", "address", "filename"])
     except getopt.GetoptError as err:
