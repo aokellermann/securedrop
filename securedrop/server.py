@@ -18,7 +18,8 @@ from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 from securedrop.file_transfer_packets import FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME, FileTransferRequestPackets, \
     FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME, FILE_TRANSFER_CHECK_REQUESTS_RESPONSE_PACKETS_NAME, \
-    FileTransferCheckRequestsPackets
+    FileTransferCheckRequestsPackets, FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME, FileTransferAcceptRequestPackets, \
+    FileTransferExchangeAddressPackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
@@ -185,12 +186,23 @@ class RegisteredUsers:
         self.write_json()
         return ""
 
+    def contacts_contains(self, user1_email, user2_email):
+        valid_contact_email1 = validate_and_normalize_email(user1_email)
+        valid_contact_email2 = validate_and_normalize_email(user2_email)
+        if not valid_contact_email1 or not valid_contact_email2:
+            return "Invalid Email Address."
+
+        email1_hash = SHA256.new(valid_contact_email1.encode()).hexdigest()
+        user = self.users[email1_hash]
+        return user.contacts and valid_contact_email2 in user.contacts
+
 
 class Server(ServerBase):
     def __init__(self, filename):
         self.users = RegisteredUsers(filename)
         self.email_to_sock = dict()
         self.sock_to_email = dict()
+        self.sock_to_address = dict()
         self.file_transfer_requests = dict()
         super().__init__()
 
@@ -211,13 +223,19 @@ class Server(ServerBase):
             await self.process_file_transfer_request(FileTransferRequestPackets(data=data), stream)
         elif prefix == FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME:
             await self.send_active_file_transfer_requests(stream)
+        elif prefix == FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME:
+            await self.process_file_transfer_request_accept(FileTransferAcceptRequestPackets(data=data), stream)
 
-    async def on_stream_closed(self, stream):
+    async def on_stream_accepted(self, stream, address):
+        self.sock_to_address[stream] = address
+
+    async def on_stream_closed(self, stream, address):
         if stream not in self.sock_to_email:
             return
         email = self.sock_to_email[stream]
         del self.sock_to_email[stream]
         del self.email_to_sock[email]
+        del self.sock_to_address[stream]
         print("removed ", email, " from online connections")
 
     async def write_status(self, stream, msg):
@@ -244,14 +262,40 @@ class Server(ServerBase):
         await self.write_status(stream, msg)
 
     async def process_file_transfer_request(self, ftrp, stream):
-        if ftrp.recipient_email not in self.file_transfer_requests:
-            self.file_transfer_requests[ftrp.recipient_email] = dict()
-        self.file_transfer_requests[ftrp.recipient_email][self.sock_to_email[stream]] = ftrp.file_info
+        sender_email = self.sock_to_email[stream]
+        recipient_email = ftrp.recipient_email
+        msg = ""
+        if recipient_email not in self.email_to_sock:
+            msg = "User [{}] is not online".format(recipient_email)
+        elif not self.users.contacts_contains(recipient_email, sender_email):
+            msg = "User [{}] has not added you as a contact".format(recipient_email)
+        elif self.sock_to_address[stream][0] != self.sock_to_address[self.email_to_sock[recipient_email]][0]:
+            msg = "User [{}] is not on the same network [{}] as you".format(recipient_email,
+                                                                            self.sock_to_address[stream][0])
+        else:
+            if recipient_email not in self.file_transfer_requests:
+                self.file_transfer_requests[recipient_email] = dict()
+            self.file_transfer_requests[recipient_email][self.sock_to_email[stream]] = ftrp.file_info
+        await self.write_status(stream, msg)
 
     async def send_active_file_transfer_requests(self, stream):
         email = self.sock_to_email[stream]
         requests = self.file_transfer_requests[email] if email in self.file_transfer_requests else dict()
         await self.write(stream, bytes(FileTransferCheckRequestsPackets(requests)))
+
+    async def process_file_transfer_request_accept(self, ftar, stream):
+        deny = not ftar.sender_email
+        recipient_address = self.sock_to_address[stream][0] if not deny else ""
+        if deny:
+            for sender_email in self.file_transfer_requests[self.sock_to_email[stream]].keys():
+                await self.write(self.email_to_sock[sender_email],
+                                 bytes(FileTransferExchangeAddressPackets(recipient_address)))
+            del self.file_transfer_requests[self.sock_to_email[stream]]
+        else:
+            sender_sock = self.email_to_sock[ftar.sender_email]
+            sender_address = self.sock_to_address[sender_sock][0]
+            await self.write(stream, bytes(FileTransferExchangeAddressPackets(sender_address)))
+            await self.write(sender_sock, bytes(FileTransferExchangeAddressPackets(recipient_address)))
 
 
 class ServerDriver:

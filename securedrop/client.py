@@ -15,7 +15,7 @@ from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 from securedrop.file_transfer_packets import FileTransferRequestPackets, FileTransferRequestResponsePackets, \
-    FileTransferCheckRequestsPackets
+    FileTransferCheckRequestsPackets, FileTransferAcceptRequestPackets, FileTransferExchangeAddressPackets
 from securedrop.utils import validate_and_normalize_email, sha256_file, sizeof_fmt
 
 DEFAULT_FILENAME = 'client.json'
@@ -145,7 +145,7 @@ class Client(ClientBase):
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
             while True:
-                print("secure_drop> ", end="")
+                print("secure_drop> ", end="", flush=True)
                 if select.select([sys.stdin], [], [], 5)[0]:
                     cmd = input()
                     if cmd == "help":
@@ -195,22 +195,35 @@ class Client(ClientBase):
 
         if file_transfer_requests:
             print("Incoming file transfer request(s):")
+            index_to_email = dict()
             i = 1
             for email, file_info in file_transfer_requests.items():
                 print("\t{}. {}".format(i, email))
                 print("\t\tname: ", file_info["name"])
                 print("\t\tsize: ", sizeof_fmt(int(file_info["size"])))
                 print("\t\tSHA256: ", file_info["SHA256"])
+                index_to_email[i] = email
                 i += 1
 
             print()
             selection = input("Enter the number for which request you'd like to accept, or 0 to deny all: ")
             try:
+                accept = True
                 selection_num = int(selection)
-                if selection_num <= 0 or selection_num > i:
+                if selection_num <= 0 or selection_num >= i:
                     raise ValueError
+
+                packets = FileTransferAcceptRequestPackets(index_to_email[selection_num])
             except ValueError:
-                pass
+                packets = FileTransferAcceptRequestPackets("")
+                accept = False
+
+            await self.write(bytes(packets))
+            if not accept:
+                return
+
+            sender_address = FileTransferExchangeAddressPackets(data=(await self.read())[4:]).address
+            print("Connecting to sender: {}".format(sender_address))
 
     async def send_file(self):
         msg = None
@@ -232,13 +245,20 @@ class Client(ClientBase):
             }
 
             await self.write(bytes(FileTransferRequestPackets(valid_email, file_info)))
+
             msg = StatusPackets(data=(await self.read())[4:]).message
             if msg != "":
                 raise RuntimeError(msg)
+
+            recipient_address = FileTransferExchangeAddressPackets(data=(await self.read())[4:]).address
+            if not recipient_address:
+                raise RuntimeError("User {} declined the file transfer".format(valid_email))
+
+            print("Connecting to recipient: {}".format(recipient_address))
         except RuntimeError as e:
             msg = str(e)
         if msg != "":
-            print("Failed to add contact: ", msg)
+            print("Failed to send file: ", msg)
 
 
 def main(hostname=None, port=None, filename=None):

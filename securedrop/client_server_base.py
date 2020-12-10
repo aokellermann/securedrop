@@ -1,11 +1,11 @@
 import ssl
+import traceback
 
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
 from tornado.tcpserver import TCPServer
 from multiprocessing import shared_memory
-
 
 MESSAGE_SENTINEL = b"\n" * 16
 
@@ -46,12 +46,12 @@ class ClientBase:
 
     async def read(self):
         data = await read(self.stream)
-        print("Client read bytes: ", data[:80])
+        print("Client read bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
         return data
 
     async def write(self, data: bytes):
         await write(self.stream, data)
-        print("Client wrote bytes: ", data[:80])
+        print("Client wrote bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
 
 
 class ServerBase(TCPServer):
@@ -80,25 +80,31 @@ class ServerBase(TCPServer):
 
     async def handle_stream(self, stream, address):
         print("Server accepted connection at host ", address)
+        await self.on_stream_accepted(stream, address)
+
         await stream.wait_for_handshake()
         while True:
             try:
                 data = await read(stream)
-                print("Server read bytes: ", data[:80])
+                print("Server read bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
                 await self.on_data_received(data, stream)
             except StreamClosedError:
                 print("Server lost client at host ", address)
-                await self.on_stream_closed(stream)
+                await self.on_stream_closed(stream, address)
                 break
-            except Exception as e:
-                print("Server caught exception: ", e)
+            except:
+                print("Server caught exception: ")
+                traceback.print_exc()
 
     async def on_data_received(self, data, stream):
         pass
 
-    async def on_stream_closed(self, address):
+    async def on_stream_accepted(self, stream, address):
+        pass
+
+    async def on_stream_closed(self, stream, address):
         pass
 
     async def write(self, stream, data: bytes):
         await write(stream, data)
-        print("Server wrote bytes: ", data[:80])
+        print("Server wrote bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
