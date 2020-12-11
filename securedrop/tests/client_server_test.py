@@ -197,7 +197,7 @@ class TestRegistration(unittest.TestCase):
                 se_list = ["email_v@test.com", "add", "name_v_2", "email_v_2@test.com", "exit"]
                 se_list[2 + i] = ""
                 se1 = InputSideEffect(se_list)
-                se2 = InputSideEffect(["password_v"])
+                se2 = InputSideEffect(["password_v12"])
                 with patch('builtins.input', side_effect=se1.se):
                     with patch('getpass.getpass', side_effect=se2.se):
                         client.main()

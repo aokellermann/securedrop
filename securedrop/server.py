@@ -106,7 +106,7 @@ class ClientData:
             "email": self.email_hash,
             "contacts": self.enc_contacts,
             "auth": self.auth.make_dict()
-        }<<<<<<< John_Issue_27_Branch
+        }
 
     def encrypt_name_contacts(self):
         if self.email is None:
@@ -188,7 +188,7 @@ class RegisteredUsers:
     def list_contacts(self, email):
         if not email:
             return "Invalid email address"
-        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        email_hash = SHA256.new(email.encode()).hexdigest()
         users_keys_list = self.users.keys()
         user = dict()
 
