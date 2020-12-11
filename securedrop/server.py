@@ -255,21 +255,15 @@ class Server(ServerBase):
         current_user_email = self.sock_to_email[stream]
         # 1: contacts_dict contains the names and email adresses that a user has added
         contacts_dict = self.users.list_contacts(current_user_email)
-        contacts_dict_list = list(contacts_dict.keys())
         online_users_list = list(self.email_to_sock.keys())
         contacts_dict_send = dict()
 
-        # print online_users_list
-        print("Online users:", online_users_list)
-        print("Contacts_dict_list: ", )
-        for i in range(len(contacts_dict_list)):
-
-            contacts_dict_other_user_list = list(self.users.list_contacts(contacts_dict_list[i]))
-            print("Other users contacts: ", contacts_dict_other_user_list)
+        for email, name in contacts_dict.items():
+            other_user_contact_list = list(self.users.list_contacts(email))
             # 2: check if a user's contacts have also added the current user as a contact.
             # 3: check if the user is online.
-            if contacts_dict_list[i] in online_users_list and current_user_email in contacts_dict_other_user_list:
-                contacts_dict_send[contacts_dict_list[i]] = contacts_dict[contacts_dict_list[i]]
+            if email in online_users_list and current_user_email in other_user_contact_list:
+                contacts_dict_send[email] = contacts_dict[email]
 
         await self.write_list_contacts_response(stream, contacts_dict_send)
 

@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 import securedrop.client as client
-from securedrop.client import TEST_FILENAME
+from securedrop.client import LIST_CONTACTS_TEST_FILENAME
 from securedrop.server import ServerDriver, Server, DEFAULT_filename, AESWrapper
 import json
 import time
@@ -177,18 +177,17 @@ class TestRegistration(unittest.TestCase):
                         self.assertEqual("name_v_3", contacts["email_v_3"])
 
     def test_aal_list_contacts_empty_dictionary(self):
-        """Ensures that client lists valid contacts successfully."""
+        """Ensures that does not list users if no users have been added"""
         with server_process():
             se1 = InputSideEffect(["email_v", "list", "exit"])
             se2 = InputSideEffect(["password_v"])
             with patch('builtins.input', side_effect=se1.se):
                 with patch('getpass.getpass', side_effect=se2.se):
-                    client.main()
-                    with open(TEST_FILENAME, 'r') as f:
+                    client.main(None, None, None, True)
+                    with open(LIST_CONTACTS_TEST_FILENAME, 'r') as f:
                         jdict = json.load(f)
                         is_empty = not bool(jdict)
-                        self.assertEqual(True, is_empty)
-
+                        self.assertTrue(is_empty)
 
     def test_aam_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""

@@ -14,9 +14,11 @@ from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListCon
 from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsPacketsResponse
 
 DEFAULT_FILENAME = 'client.json'
-TEST_FILENAME = 'list_contacts_test.json'
+LIST_CONTACTS_TEST_FILENAME = 'list_contacts_test.json'
 DEFAULT_HOSTNAME = '127.0.0.1'
 DEFAULT_PORT = 6969
+DEBUG_DEFAULT = False
+DEBUG = False
 
 
 class RegisteredUsers:
@@ -173,27 +175,37 @@ class Client(ClientBase):
     async def list_contacts(self):
         msg = ""
         try:
-            with open(TEST_FILENAME, 'w') as f:
-
-                await self.write(bytes(ListContactsPackets()))
-                contact_dict = ListContactsPacketsResponse(data=(await self.read())[4:]).contacts
-                contacts_keys = list(contact_dict.keys())
-                json.dump(contact_dict, f)
-                # print contacts by Email and Name
+            await self.write(bytes(ListContactsPackets()))
+            contact_dict = ListContactsPacketsResponse(data=(await self.read())[4:]).contacts
+            # print contacts by Email and Name
+            if len(contact_dict) > 0:
                 print("Email:\t\t\t\tName:")
-                for i in range(len(contacts_keys)):
-                    print(contacts_keys[i] + "\t\t\t" + contact_dict[contacts_keys[i]])
+                for email, name in contact_dict.items():
+                        print(email + "\t\t\t" + name)
+            else:
+                print("No contacts online!")
+
+            if DEBUG:
+                try:
+                    with open(LIST_CONTACTS_TEST_FILENAME, 'w') as f:
+                        json.dump(contact_dict, f)
+                except RuntimeError as e:
+                    msg = str(e)
 
         except RuntimeError as e:
             msg = str(e)
+
         if msg != "":
             print("Failed to list contacts: ", msg)
 
 
-def main(hostname=None, port=None, filename=None):
+def main(hostname=None, port=None, filename=None, debug=None):
+
     hostname = hostname if hostname is not None else DEFAULT_HOSTNAME
     port = port if port is not None else DEFAULT_PORT
     filename = filename if filename is not None else DEFAULT_FILENAME
+    global DEBUG
+    DEBUG = debug if debug is not None else DEBUG_DEFAULT
     Client(hostname, port, filename).run()
 
 
