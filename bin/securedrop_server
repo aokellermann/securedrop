@@ -4,7 +4,6 @@ import os
 
 from securedrop import server
 
-
 if __name__ == "__main__":
     home_dir = os.getenv("HOME")
     if home_dir is None:

@@ -2,12 +2,13 @@
 
 import os
 import base64
-import hashlib
 import json
 from multiprocessing import shared_memory
 
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES
+from Crypto.Hash import SHAKE256, SHA256, SHA512
+from Crypto.Protocol.KDF import PBKDF2
 import Crypto.Util.Padding
 
 from securedrop import ServerBase
@@ -15,8 +16,10 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+
 from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
 from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsPacketsResponse
+from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
 DEFAULT_PORT = 6969
@@ -40,7 +43,7 @@ class Authentication:
         if jdict is not None:
             salt, key = base64.b64decode(jdict["salt"]), base64.b64decode(jdict["key"])
         elif key is not None:
-            key = hashlib.pbkdf2_hmac('sha512', key.encode('utf-8'), salt, 10000)
+            key = PBKDF2(key.encode('utf-8'), salt, 64, count=10000, hmac_hash_module=SHA512)
 
         self.salt, self.key = salt, key
 
@@ -48,16 +51,14 @@ class Authentication:
         return self.salt == other.salt and self.key == other.key
 
     def make_dict(self):
-        return {
-            "salt": base64.b64encode(self.salt).decode('utf-8'),
-            "key": base64.b64encode(self.key).decode('utf-8')
-        }
+        return {"salt": base64.b64encode(self.salt).decode('utf-8'), "key": base64.b64encode(self.key).decode('utf-8')}
 
 
 class AESWrapper(object):
     def __init__(self, key):
         self.bs = AES.block_size
-        self.key = Crypto.Util.Padding.pad(key.encode('utf-8'), self.bs)
+        shake = SHAKE256.new(key.encode('utf-8'))
+        self.key = shake.read(32)
 
     def encrypt(self, raw):
         raw = Crypto.Util.Padding.pad(raw.encode('utf-8'), self.bs)
@@ -92,20 +93,20 @@ class ClientData:
                 jdict["name"], jdict["email"], jdict["contacts"], Authentication(jdict=jdict["auth"])
         else:
             self.name, self.email, self.contacts, self.auth = name, email, contacts, Authentication(password)
-            self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
+            self.email_hash = SHA256.new(self.email.encode()).hexdigest()
 
     def __eq__(self, other):
         return self.name == other.name
 
     def make_dict(self):
-        self.email_hash = hashlib.sha256((self.email.encode())).hexdigest()
+        self.email_hash = SHA256.new(self.email.encode()).hexdigest()
         self.encrypt_name_contacts()
         return {
             "name": self.enc_name,
             "email": self.email_hash,
             "contacts": self.enc_contacts,
             "auth": self.auth.make_dict()
-        }
+        }<<<<<<< John_Issue_27_Branch
 
     def encrypt_name_contacts(self):
         if self.email is None:
@@ -143,16 +144,19 @@ class RegisteredUsers:
             json.dump(self.make_dict(), f)
 
     def register_new_user(self, name, email, password):
-        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        valid_email = validate_and_normalize_email(email)
+        if valid_email is None:
+            return "Invalid Email Address."
+        email_hash = SHA256.new(valid_email.encode()).hexdigest()
         if email_hash in self.users:
             return "User already exists."
-        self.users[email_hash] = ClientData(name=name, email=email, password=password, contacts=dict())
+        self.users[email_hash] = ClientData(name=name, email=valid_email, password=password, contacts=dict())
         self.write_json()
         print("User Registered.")
         return ""
 
     def login(self, email, password):
-        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        email_hash = SHA256.new(email.encode()).hexdigest()
         if email_hash not in self.users:
             print("Email and Password Combination Invalid.")
             return "Email and Password Combination Invalid."
@@ -168,14 +172,16 @@ class RegisteredUsers:
         return ""
 
     def add_contact(self, email, contact_name, contact_email):
-        if not contact_email or not contact_name:
-            return "Invalid email or contact."
-
-        email_hash = hashlib.sha256((email.encode())).hexdigest()
+        valid_contact_email = validate_and_normalize_email(contact_email)
+        if not valid_contact_email:
+            return "Invalid Email Address."
+        if not contact_name:
+            return "Invalid contact name."
+        email_hash = SHA256.new(email.encode()).hexdigest()
         user = self.users[email_hash]
         if not user.contacts:
             user.contacts = dict()
-        user.contacts[contact_email] = contact_name
+        user.contacts[valid_contact_email] = contact_name
         self.write_json()
         return ""
 
