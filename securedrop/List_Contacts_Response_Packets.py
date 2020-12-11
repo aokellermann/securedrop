@@ -17,4 +17,3 @@ class ListContactsPacketsResponse:
 
     def __bytes__(self):
         return LIST_CONTACTS_RESPONSE_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
-

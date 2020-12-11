@@ -191,7 +191,7 @@ class Client(ClientBase):
             if len(contact_dict) > 0:
                 print("Email:\t\t\t\tName:")
                 for email, name in contact_dict.items():
-                        print(email + "\t\t\t" + name)
+                    print(email + "\t\t\t" + name)
             else:
                 print("No contacts online!")
 

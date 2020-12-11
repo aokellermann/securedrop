@@ -78,7 +78,6 @@ class TestRegistration(unittest.TestCase):
                             with self.assertRaises(RuntimeError):
                                 client.main()
 
-
     def test_aad_initial_ask_to_register_invalid_email(self):
         """Ensures that client throws if the user inputs invalid email during registration."""
         with server_process():
@@ -254,7 +253,6 @@ class TestRegistration(unittest.TestCase):
                         self.assertEqual("name_v_2", contacts["email_v_2@test.com"])
                         self.assertEqual("name_v_3", contacts["email_v_3@test.com"])
 
-
     def test_aap_list_contacts_empty_dictionary(self):
         """Ensures that does not list users if no users have been added"""
         with server_process():
@@ -268,7 +266,6 @@ class TestRegistration(unittest.TestCase):
                         is_empty = not bool(jdict)
                         self.assertTrue(is_empty)
 
-
     def test_aaq_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
         server = Server(DEFAULT_filename)
@@ -280,7 +277,6 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(user.contacts["email_v_2@test.com"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3@test.com"], "name_v_3")
 
-
     def test_aar_data_in_memory_after_decrypt(self):
         """Ensures that Client data can be accessed in local memory after decryption"""
         server = Server(DEFAULT_filename)
@@ -290,7 +286,6 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(user.name, "name_v")
         self.assertEqual(user.contacts["email_v_2@test.com"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3@test.com"], "name_v_3")
-
 
     def test_aas_test_decrypt_wrong_password(self):
         """Ensures that client throws an error when decryption is not successful (wrong key)."""
