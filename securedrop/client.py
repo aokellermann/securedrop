@@ -47,6 +47,10 @@ class RegisteredUsers:
         if pw1 != pw2:
             raise RuntimeError("The two entered passwords don't match!")
 
+        # enforce password length to min of 12 characters
+        if len(pw1) < 12:
+            raise RuntimeError("Password is too short! Password must be at least 12 characters")
+
         if not name or not email or not pw1:
             raise RuntimeError("Empty input")
 
