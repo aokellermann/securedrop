@@ -7,7 +7,7 @@ from tornado.tcpclient import TCPClient
 from tornado.tcpserver import TCPServer
 from multiprocessing import shared_memory
 
-MESSAGE_SENTINEL = b"\n" * 16
+MESSAGE_SENTINEL = b"\n" * 2
 
 
 async def read(stream):
@@ -27,10 +27,12 @@ class ClientBase:
         self.stream = None
         self.host = host
         self.port = port
+        self.server_cert_path = ""
 
-    def run(self, timeout=None):
+    def run(self, timeout=None, server_cert_path="server.pem"):
         print("Client starting main loop")
         try:
+            self.server_cert_path = server_cert_path
             IOLoop.current().run_sync(self.main, timeout)
         finally:
             print("Client exiting main loop")
@@ -38,10 +40,11 @@ class ClientBase:
     async def main(self):
         print("Client starting connection")
         ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-        ssl_ctx.load_verify_locations('server.pem')
-        ssl_ctx.load_cert_chain('server.pem')
+        if self.server_cert_path:
+            ssl_ctx.load_verify_locations(self.server_cert_path)
+            ssl_ctx.load_cert_chain(self.server_cert_path)
         ssl_ctx.check_hostname = False
-        self.stream = await TCPClient().connect('127.0.0.1', self.port, ssl_options=ssl_ctx)
+        self.stream = await TCPClient().connect(self.host, self.port, ssl_options=ssl_ctx)
         print("Client connected")
 
     async def read(self):
@@ -55,9 +58,10 @@ class ClientBase:
 
 
 class ServerBase(TCPServer):
-    def __init__(self):
+    def __init__(self, cert_path="server.pem"):
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        ssl_ctx.load_cert_chain("server.pem")
+        if cert_path:
+            ssl_ctx.load_cert_chain(cert_path)
         super().__init__(ssl_options=ssl_ctx)
         self.shm = None
 
