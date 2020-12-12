@@ -15,14 +15,14 @@ import json
 # 2. `Y -> S`: every one second, Y asks server for any requests
 # 3. `S -> X/F -> Y`: server responds with active requests
 # 4. `Y -> Yes/No -> S`: Y accepts or denies transfer request
-# 5(a). `S -> X -> Y, S -> Y -> X`: if Y accepted, server sends X's IP address to Y and server sends Y's IP address to X
-# 5(b). `S -> Deny -> X`: if Y denied, server notifies X of denial
-# 6(a). `Y listens for X`: if Y accepted, Y listens for X
-# 6(b). `X connects to Y`: if Y accepted, X connects to Y
+# 5(a). `S -> Token -> Y`: if Y accepted, server sends a unique token Y
+# 5(b). `S -> EmptyToken -> X`: if Y denied, server notifies X of denial (empty token)
+# 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
+# 7. `S -> Token/Port -> X`: S sends the same token and port to X
 
 # Part 2: Transfer Protocol
 
-# 1. `X -> Hash(F)/Chunks(F) -> Y`: X sends the hash of F and the number of chunks in F to Y
+# 1. `X -> Hash(F)/Chunks(F)/UniqueToken -> Y`: X sends the hash of F, the number of chunks in F, and a rand token to Y
 # 2. `X -> NextChunk(F) -> Y`: X sends next chunk of file to Y
 # 3. `Y -> Success/Failure -> X`: after all chunks received, Y sends success/failure to X
 
@@ -105,46 +105,93 @@ class FileTransferAcceptRequestPackets:
         return FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
 
 
-# 5(a). `S -> X -> Y, S -> Y -> X`: if Y accepted, server sends X's IP address to Y and server sends Y's IP address to X
-# 5(b). `S -> Deny -> X`: if Y denied, server notifies X of denial
+# 5(a). `S -> Token -> Y`: if Y accepted, server sends a unique token Y
+# 5(b). `S -> EmptyToken -> X`: if Y denied, server notifies X of denial (empty token)
 
-FILE_TRANSFER_EXCHANGE_ADDRESS_PACKETS_NAME = b"FTEA"
+FILE_TRANSFER_SEND_TOKEN_PACKETS_NAME = b"FTEA"
 
 
-class FileTransferExchangeAddressPackets:
-    def __init__(self, address: str = None, data=None):
-        # If address is empty string, the request was denied
-        self.address = address
+class FileTransferSendTokenPackets:
+    def __init__(self, token: bytes = None, data=None):
+        # If token is empty, the request was denied
+        self.token = token
         self.jdict = dict()
         if data is not None:
             self.jdict = json.loads(data)
-            self.address = self.jdict["address"]
-        elif address is not None:
+            self.token = self.jdict["token"]
+        elif token is not None:
             self.jdict = {
-                "address": self.address,
+                "token": self.token,
             }
 
     def __bytes__(self):
-        return FILE_TRANSFER_EXCHANGE_ADDRESS_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
+        return FILE_TRANSFER_SEND_TOKEN_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
+
+
+# 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
+
+FILE_TRANSFER_SEND_PORT_PACKETS_NAME = b"FTSP"
+
+
+class FileTransferSendPortPackets:
+    def __init__(self, port: int = None, data=None):
+        # If port is empty, the request was denied
+        self.port = port
+        self.jdict = dict()
+        if data is not None:
+            self.jdict = json.loads(data)
+            self.port = self.jdict["port"]
+        elif port is not None:
+            self.jdict = {
+                "port": self.port,
+            }
+
+    def __bytes__(self):
+        return FILE_TRANSFER_SEND_TOKEN_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
+
+
+# 7. `S -> Token/Port -> X`: S sends the same token and port to X
+
+FILE_TRANSFER_SEND_PORT_TOKEN_PACKETS_NAME = b"FTPT"
+
+
+class FileTransferSendPortTokenPackets:
+    def __init__(self, port: int = None, token: bytes = None, data=None):
+        # If port is empty, the request was denied
+        self.port, self.token = port, token
+        self.jdict = dict()
+        if data is not None:
+            self.jdict = json.loads(data)
+            self.port, self.token = self.jdict["port"], self.jdict["token"]
+        elif port is not None and token is not None:
+            self.jdict = {
+                "port": self.port,
+                "token": self.token,
+            }
+
+    def __bytes__(self):
+        return FILE_TRANSFER_SEND_TOKEN_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
 
 
 # Part 2: Transfer Protocol
 
-# 1. `X -> Hash(F)/Chunks(F) -> Y`: X sends the hash of F and the number of chunks in F to Y
+# 1. `X -> Hash(F)/Chunks(F)/UniqueToken -> Y`: X sends the hash of F and the number of chunks in F to Y
 
+FILE_TRANSFER_P2P_CHUNK_SIZE = 256 * 16
 FILE_TRANSFER_P2P_FILEINFO_PACKETS_NAME = b"FTPF"
 
 
 class FileTransferP2PFileInfoPackets:
-    def __init__(self, file_info: dict = None, data=None):
-        self.file_info = file_info
+    def __init__(self, file_info: dict = None, token: bytes = None, data=None):
+        self.file_info, self.token = file_info, token
         self.jdict = dict()
         if data is not None:
             self.jdict = json.loads(data)
-            self.file_info = self.jdict["file_info"]
-        elif file_info is not None:
+            self.file_info, self.token = token = self.jdict["file_info"], self.jdict["token"]
+        elif file_info is not None and token is not None:
             self.jdict = {
                 "file_info": self.file_info,
+                "token": self.token,
             }
 
     def __bytes__(self):
