@@ -34,5 +34,5 @@ if __name__ == "__main__":
         elif o in ("-v", "--verbose"):
             verbose_flag = True
         else:
-            assert False, "unhandled option"
+            raise RuntimeError("Unhandled argument found.")
     client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_hostname)
