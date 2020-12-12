@@ -18,7 +18,7 @@ from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 
 from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
-from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsPacketsResponse
+from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
@@ -185,18 +185,17 @@ class RegisteredUsers:
         self.write_json()
         return ""
 
-    def list_contacts(self, email):
+    def get_contacts(self, email):
         if not email:
             return "Invalid email address"
         email_hash = SHA256.new(email.encode()).hexdigest()
-        users_keys_list = self.users.keys()
-        user = dict()
+        user_contacts_dict = dict()
 
-        if email_hash in users_keys_list:
-            user = self.users[email_hash]
-            return user.contacts
+        if email_hash in self.users.keys():
+            user_contacts_dict = self.users[email_hash]
+            return user_contacts_dict.contacts
         else:
-            return user
+            return user_contacts_dict
 
 
 class Server(ServerBase):
@@ -234,7 +233,7 @@ class Server(ServerBase):
         await self.write(stream, bytes(StatusPackets(msg)))
 
     async def write_list_contacts_response(self, stream, contacts_dict):
-        await self.write(stream, bytes(ListContactsPacketsResponse(contacts_dict)))
+        await self.write(stream, bytes(ListContactsResponsePackets(contacts_dict)))
 
     async def process_register(self, reg, stream):
         msg = self.users.register_new_user(reg.name, reg.email, reg.password)
@@ -260,16 +259,14 @@ class Server(ServerBase):
         # three verification steps
         current_user_email = self.sock_to_email[stream]
         # 1: contacts_dict contains the names and email adresses that a user has added
-        contacts_dict = self.users.list_contacts(current_user_email)
-        online_users_list = list(self.email_to_sock.keys())
+        contacts_dict = self.users.get_contacts(current_user_email)
         contacts_dict_send = dict()
 
         for email, name in contacts_dict.items():
-            other_user_contact_list = list(self.users.list_contacts(email))
             # 2: check if a user's contacts have also added the current user as a contact.
             # 3: check if the user is online.
-            if email in online_users_list and current_user_email in other_user_contact_list:
-                contacts_dict_send[email] = contacts_dict[email]
+            if email in self.email_to_sock and current_user_email in self.users.get_contacts(email):
+                contacts_dict_send[email] = name
 
         await self.write_list_contacts_response(stream, contacts_dict_send)
 

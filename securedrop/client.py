@@ -10,7 +10,7 @@ from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
-from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsPacketsResponse
+from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_FILENAME = 'client.json'
@@ -186,7 +186,7 @@ class Client(ClientBase):
         msg = ""
         try:
             await self.write(bytes(ListContactsPackets()))
-            contact_dict = ListContactsPacketsResponse(data=(await self.read())[4:]).contacts
+            contact_dict = ListContactsResponsePackets(data=(await self.read())[4:]).contacts
             # print contacts by Email and Name
             if len(contact_dict) > 0:
                 print("Email:\t\t\t\tName:")

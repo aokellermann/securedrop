@@ -3,7 +3,7 @@ import json
 LIST_CONTACTS_RESPONSE_PACKETS_NAME = b"LCRN"
 
 
-class ListContactsPacketsResponse:
+class ListContactsResponsePackets:
     def __init__(self, contacts=None, data=None):
         self.contacts = contacts
         self.jdict = dict()
