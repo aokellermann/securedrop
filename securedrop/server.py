@@ -16,11 +16,10 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
-from securedrop.utils import validate_and_normalize_email
+from securedrop.utils import validate_and_normalize_email, Verbose
 
 DEFAULT_filename = 'server.json'
 DEFAULT_PORT = 6969
-
 
 def make_salt():
     return get_random_bytes(32)

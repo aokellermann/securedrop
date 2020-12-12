@@ -4,6 +4,7 @@ import os
 import sys
 
 from securedrop import server
+from securedrop.utils import Verbose
 
 if __name__ == "__main__":
     home_dir = os.getenv("HOME")
@@ -17,19 +18,18 @@ if __name__ == "__main__":
             raise RuntimeError("Failed to create securedrop directory: $HOME/.securedrop")
     securedrop_file = os.path.join(securedrop_dir, "server_db.json")
     securedrop_port = None
-    verbose_flag = False
     try:
         opts, args = getopt.getopt(sys.argv[1:], "pfv", ["port", "filename", "verbose"])
     except getopt.GetoptError as err:
         print(err)  # will print something like "option -a not recognized"
         sys.exit(2)
     for o, a in opts:
-        if o in ("-p", "--port"):
+        if o in ("-v", "--verbose"):
+            Verbose.set(True)
+        elif o in ("-p", "--port"):
             securedrop_port = a
         elif o in ("-f", "--filename"):
             securedrop_file = a
-        elif o in ("-v", "--verbose"):
-            verbose_flag = True
         else:
             assert False, "unhandled option"
     server.main(filename=securedrop_file, port=securedrop_port)

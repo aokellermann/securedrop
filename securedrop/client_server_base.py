@@ -5,6 +5,7 @@ from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
 from tornado.tcpserver import TCPServer
 from multiprocessing import shared_memory
+from securedrop.utils import Verbose
 
 
 async def read(stream):
@@ -43,12 +44,12 @@ class ClientBase:
 
     async def read(self):
         data = await read(self.stream)
-        print("Client read bytes: ", data[:80])
+        Verbose.print("Client read bytes: ", data[:80])
         return data
 
     async def write(self, data: bytes):
         await write(self.stream, data)
-        print("Client wrote bytes: ", data[:80])
+        Verbose.print("Client wrote bytes: ")
 
 
 class ServerBase(TCPServer):
@@ -81,7 +82,7 @@ class ServerBase(TCPServer):
         while True:
             try:
                 data = await read(stream)
-                print("Server read bytes: ", data[:80])
+                Verbose.print("Server read bytes: ", data[:80])
                 await self.on_data_received(data, stream)
             except StreamClosedError:
                 print("Server lost client at host ", address)
@@ -98,4 +99,4 @@ class ServerBase(TCPServer):
 
     async def write(self, stream, data: bytes):
         await write(stream, data)
-        print("Server wrote bytes: ", data[:80])
+        Verbose.print("Server wrote bytes: ", data[:80])

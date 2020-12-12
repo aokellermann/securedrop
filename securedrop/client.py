@@ -178,10 +178,11 @@ class Client(ClientBase):
             print("Failed to add contact: ", msg)
 
 
-def main(hostname=None, port=None, filename=None):
+def main(hostname=None, port=None, filename=None, verbose=None):
     hostname = hostname if hostname is not None else DEFAULT_HOSTNAME
     port = port if port is not None else DEFAULT_PORT
     filename = filename if filename is not None else DEFAULT_FILENAME
+    verbose = verbose if verbose is not None else False
     Client(hostname, port, filename).run()
 
 
