@@ -189,13 +189,7 @@ class RegisteredUsers:
         if not email:
             return "Invalid email address"
         email_hash = SHA256.new(email.encode()).hexdigest()
-        user_contacts_dict = dict()
-
-        if email_hash in self.users.keys():
-            user_contacts_dict = self.users[email_hash]
-            return user_contacts_dict.contacts
-        else:
-            return user_contacts_dict
+        return self.users[email_hash].contacts if email_hash in self.users else dict()
 
 
 class Server(ServerBase):
