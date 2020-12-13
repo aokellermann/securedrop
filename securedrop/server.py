@@ -21,6 +21,7 @@ from securedrop.utils import validate_and_normalize_email
 DEFAULT_filename = 'server.json'
 DEFAULT_PORT = 6969
 
+
 def make_salt():
     return get_random_bytes(32)
 
