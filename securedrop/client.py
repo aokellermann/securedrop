@@ -246,7 +246,10 @@ class Client(ClientBase):
 
             # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
             p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name)
-            p2p_server_process = Process(target=p2p_server.run, args=(0, sentinel.name,))
+            p2p_server_process = Process(target=p2p_server.run, args=(
+                0,
+                sentinel.name,
+            ))
             p2p_server_process.start()
 
             print("Started P2P server. Waiting for listen...")
@@ -329,8 +332,7 @@ class Client(ClientBase):
 
             progress = shared_memory.SharedMemory(create=True, size=8)
             progress_lock = Lock()
-            p2p_client = P2PClient(port, token, file_path, file_size, file_sha256, progress.name,
-                                   progress_lock)
+            p2p_client = P2PClient(port, token, file_path, file_size, file_sha256, progress.name, progress_lock)
             p2p_client_process = Process(target=p2p_client.run)
             p2p_client_process.start()
 

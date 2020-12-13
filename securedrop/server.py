@@ -297,16 +297,12 @@ class Server(ServerBase):
         token = get_random_bytes(32) if not deny else b""
         if deny:
             for sender_email in self.file_transfer_requests[self.sock_to_email[stream]].keys():
-                await self.write(self.email_to_sock[sender_email],
-                                 bytes(FileTransferSendTokenPackets(token)))
+                await self.write(self.email_to_sock[sender_email], bytes(FileTransferSendTokenPackets(token)))
             del self.file_transfer_requests[self.sock_to_email[stream]]
         else:
             del self.file_transfer_requests[self.sock_to_email[stream]][ftar.sender_email]
             sender_sock = self.email_to_sock[ftar.sender_email]
-            self.file_transfer_recipients[stream] = {
-                "token": token,
-                "sender": sender_sock
-            }
+            self.file_transfer_recipients[stream] = {"token": token, "sender": sender_sock}
             await self.write(stream, bytes(FileTransferSendTokenPackets(token)))
 
     # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
