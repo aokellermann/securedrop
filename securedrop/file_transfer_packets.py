@@ -176,7 +176,7 @@ class FileTransferSendPortTokenPackets:
 
 # 1. `X -> Hash(F)/Chunks(F)/UniqueToken -> Y`: X sends the hash of F and the number of chunks in F to Y
 
-FILE_TRANSFER_P2P_CHUNK_SIZE = 256 * 16
+FILE_TRANSFER_P2P_CHUNK_SIZE = 256 * 256
 FILE_TRANSFER_P2P_FILEINFO_PACKETS_NAME = b"FTPF"
 
 

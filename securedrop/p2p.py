@@ -104,7 +104,7 @@ class P2PServer(ServerBase):
     async def process_chunk(self, chunk):
         if not self.out_path:
             self.out_path = os.path.join(self.out_dir, self.out_filename)
-        with open(self.out_path, "wb") as file:
+        with open(self.out_path, "ab") as file:
             file.write(b64decode(chunk.chunk))
             self.received_chunks += 1
             with self.lock:
