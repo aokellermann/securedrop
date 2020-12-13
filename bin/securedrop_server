@@ -2,9 +2,9 @@
 import getopt
 import os
 import sys
-
+from securedrop.utils import VerbosePrinter
 from securedrop import server
-from securedrop.utils import Verbose
+
 
 if __name__ == "__main__":
     home_dir = os.getenv("HOME")
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         sys.exit(2)
     for o, a in opts:
         if o in ("-v", "--verbose"):
-            Verbose.set(True)
+            VerbosePrinter(True)
         elif o in ("-p", "--port"):
             securedrop_port = a
         elif o in ("-f", "--filename"):

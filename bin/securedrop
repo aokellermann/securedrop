@@ -2,8 +2,8 @@
 import getopt
 import os
 import sys
-
 from securedrop import client
+from securedrop.utils import VerbosePrinter
 
 if __name__ == "__main__":
     home_dir = os.getenv("HOME")
@@ -32,7 +32,8 @@ if __name__ == "__main__":
         elif o in ("-a", "--address"):
             securedrop_hostname = a
         elif o in ("-v", "--verbose"):
-            verbose_flag = True
+            init = VPrinter(True)
+            print("test")
         else:
             assert False, "unhandled option"
     client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_hostname)
