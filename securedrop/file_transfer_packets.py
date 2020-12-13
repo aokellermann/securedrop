@@ -199,7 +199,7 @@ class FileTransferP2PFileInfoPackets:
 
 # 2. `X -> NextChunk(F) -> Y`: X sends next chunk of file to Y
 
-FILE_TRANSFER_P2P_CHUNK_PACKETS_NAME = b"FTPF"
+FILE_TRANSFER_P2P_CHUNK_PACKETS_NAME = b"FTPC"
 
 
 class FileTransferP2PChunkPackets:
@@ -208,10 +208,10 @@ class FileTransferP2PChunkPackets:
         self.jdict = dict()
         if data is not None:
             self.jdict = json.loads(data)
-            self.chunk = self.jdict["chunk"]
+            self.chunk = base64.b64decode(self.jdict["chunk"])
         elif chunk is not None:
             self.jdict = {
-                "chunk": self.chunk,
+                "chunk": str(base64.b64encode(self.chunk), encoding='ascii'),
             }
 
     def __bytes__(self):

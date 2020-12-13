@@ -1,3 +1,4 @@
+import os
 from base64 import b64encode, b64decode
 from math import ceil
 from multiprocessing import shared_memory
@@ -22,8 +23,9 @@ class P2PClient(ClientBase):
 
             total_chunks = ceil(self.in_file_size / FILE_TRANSFER_P2P_CHUNK_SIZE)
             file_info = {
+                "name": os.path.basename(self.in_filename),
                 "chunks": total_chunks,
-                "sha256": self.in_file_sha256,
+                "SHA256": self.in_file_sha256,
             }
 
             await self.write(bytes(FileTransferP2PFileInfoPackets(file_info, self.token)))
@@ -54,6 +56,7 @@ class P2PServer(ServerBase):
         self.sentinel = None
         self.out_filename = ""
         self.verified = False
+        self.out_path = ""
 
     def run(self, port, shm_name):
         self.sentinel = shared_memory.SharedMemory(shm_name)
@@ -90,6 +93,7 @@ class P2PServer(ServerBase):
             stream.close()
 
         self.verified = True
+        self.out_filename = file_info.file_info["name"]
         self.total_chunks = file_info.file_info["chunks"]
         self.sha256 = file_info.file_info["SHA256"]
 
@@ -98,14 +102,16 @@ class P2PServer(ServerBase):
             self.progress.buf[4:8] = self.total_chunks.to_bytes(4, byteorder='little')
 
     async def process_chunk(self, chunk):
-        with open(self.out_dir + "/" + self.out_filename, "wb") as file:
+        if not self.out_path:
+            self.out_path = os.path.join(self.out_dir, self.out_filename)
+        with open(self.out_path, "wb") as file:
             file.write(b64decode(chunk.chunk))
             self.received_chunks += 1
             with self.lock:
                 self.progress.buf[0:4] = self.received_chunks.to_bytes(4, byteorder='little')
 
     async def complete_transfer(self, stream):
-        compare_sha256 = sha256_file(self.out_dir)
+        compare_sha256 = sha256_file(self.out_path)
         msg = "" if self.sha256 == compare_sha256 else "File hashes don't match!"
         await self.write(stream, bytes(StatusPackets(msg)))
         self.sentinel.buf[0] = 1

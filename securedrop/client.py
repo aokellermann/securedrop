@@ -308,10 +308,11 @@ class Client(ClientBase):
             if not os.path.exists(file_path):
                 raise RuntimeError("Cannot find file: {}".format(file_path))
 
+            file_name = os.path.basename(file_path)
             file_size = os.path.getsize(file_path)
             file_sha256 = sha256_file(file_path)
             file_info = {
-                "name": os.path.basename(file_path),
+                "name": file_name,
                 "size": file_size,
                 "SHA256": file_sha256,
             }
@@ -333,30 +334,31 @@ class Client(ClientBase):
             progress = shared_memory.SharedMemory(create=True, size=8)
             progress_lock = Lock()
             p2p_client = P2PClient(port, token, file_path, file_size, file_sha256, progress.name, progress_lock)
-            p2p_client_process = Process(target=p2p_client.run)
-            p2p_client_process.start()
-
-            time_start = time.time()
-
-            try:
-                while p2p_client_process.is_alive():
-                    # with progress_lock:
-                    #     print("{}/{} chunks sent".format(int.from_bytes(progress.buf[0:4], byteorder='little'),
-                    #                                      int.from_bytes(progress.buf[4:8], byteorder='little')))
-                    p2p_client_process.join(1)
-
-            except KeyboardInterrupt:
-                p2p_client_process.terminate()
-                raise RuntimeError("User requested abort")
-            finally:
-                if p2p_client_process.is_alive():
-                    p2p_client_process.terminate()
-                progress.close()
-                progress.unlink()
-
-                time_end = time.time()
-
-            print("File transfer completed in {} seconds.".format(time_end - time_start))
+            await p2p_client.main()
+            # p2p_client_process = Process(target=p2p_client.run)
+            # p2p_client_process.start()
+            #
+            # time_start = time.time()
+            #
+            # try:
+            #     while p2p_client_process.is_alive():
+            #         # with progress_lock:
+            #         #     print("{}/{} chunks sent".format(int.from_bytes(progress.buf[0:4], byteorder='little'),
+            #         #                                      int.from_bytes(progress.buf[4:8], byteorder='little')))
+            #         p2p_client_process.join(1)
+            #
+            # except KeyboardInterrupt:
+            #     p2p_client_process.terminate()
+            #     raise RuntimeError("User requested abort")
+            # finally:
+            #     if p2p_client_process.is_alive():
+            #         p2p_client_process.terminate()
+            #     progress.close()
+            #     progress.unlink()
+            #
+            #     time_end = time.time()
+            #
+            # print("File transfer completed in {} seconds.".format(time_end - time_start))
 
         except RuntimeError as e:
             msg = str(e)

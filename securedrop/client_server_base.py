@@ -23,17 +23,16 @@ async def write(stream, data: bytes):
 
 
 class ClientBase:
-    def __init__(self, host, port):
+    def __init__(self, host, port, server_cert_path="server.pem"):
         super().__init__()
         self.stream = None
         self.host = host
         self.port = port
-        self.server_cert_path = ""
+        self.server_cert_path = server_cert_path
 
-    def run(self, timeout=None, server_cert_path="server.pem"):
+    def run(self, timeout=None):
         print("Client starting main loop")
         try:
-            self.server_cert_path = server_cert_path
             IOLoop.current().run_sync(self.main, timeout)
         finally:
             print("Client exiting main loop")
