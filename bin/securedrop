@@ -18,7 +18,6 @@ if __name__ == "__main__":
     securedrop_file = os.path.join(securedrop_dir, "client_db.json")
     securedrop_port = None
     securedrop_hostname = None
-    verbose_flag = False
     try:
         opts, args = getopt.getopt(sys.argv[1:], "pafv", ["port", "address", "filename", "verbose"])
     except getopt.GetoptError as err:
@@ -32,8 +31,7 @@ if __name__ == "__main__":
         elif o in ("-a", "--address"):
             securedrop_hostname = a
         elif o in ("-v", "--verbose"):
-            init = VPrinter(True)
-            print("test")
+            VerbosePrinter(True)
         else:
             assert False, "unhandled option"
     client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_hostname)

@@ -1,13 +1,11 @@
 import ssl
 
+from securedrop.utils import VerbosePrinter
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
 from tornado.tcpserver import TCPServer
 from multiprocessing import shared_memory
-from securedrop.utils import VerbosePrinter
-
-
 
 
 async def read(stream):
