@@ -27,7 +27,7 @@ PYTHONPATH=$PYTHONPATH:. ./bin/securedrop
 ```
 
 ## Contributing
-To read more about the design and security features used in this project see the contributing file.
+To read more about the design and security features used in this project see the [contributing file](CONTRIBUTING.MD).
 
 ## License
 [MIT](LICENSE)
