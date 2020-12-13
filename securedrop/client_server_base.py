@@ -39,14 +39,14 @@ class ClientBase:
             print("Client exiting main loop")
 
     async def main(self):
-        print("Client starting connection")
+        print("Client starting connection to ", (self.host, self.port))
         ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         if self.server_cert_path:
             ssl_ctx.load_verify_locations(self.server_cert_path)
             ssl_ctx.load_cert_chain(self.server_cert_path)
         ssl_ctx.check_hostname = False
         self.stream = await TCPClient().connect(self.host, self.port, ssl_options=ssl_ctx)
-        print("Client connected")
+        print("Client connected to ", (self.host, self.port))
 
     async def read(self):
         data = await read(self.stream)
@@ -72,6 +72,7 @@ class ServerBase(TCPServer):
         socks = bind_sockets(port)
         self.add_sockets(socks)
         self.listen_ports = {sock.getsockname()[1] for sock in socks}
+        print("Server listening on port(s) ", self.listen_ports)
 
     def run(self, port, shm_name):
         print("Server starting")

@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 
-import json
 import getpass
+import json
 import os
 import select
 import sys
 import time
+from multiprocessing import Process, shared_memory, Lock
 
-from threading import Thread, Lock
+import nest_asyncio
 
+from securedrop.add_contact_packets import AddContactPackets
 from securedrop.client_server_base import ClientBase
-from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
-from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
-from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
-from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 from securedrop.file_transfer_packets import FileTransferRequestPackets, FileTransferRequestResponsePackets, \
-    FileTransferCheckRequestsPackets, FileTransferAcceptRequestPackets, FileTransferExchangeAddressPackets
+    FileTransferCheckRequestsPackets, FileTransferAcceptRequestPackets, FileTransferSendTokenPackets, \
+    FileTransferSendPortPackets, FileTransferSendPortTokenPackets
+from securedrop.login_packets import LoginPackets
+from securedrop.p2p import P2PClient, P2PServer
+from securedrop.register_packets import RegisterPackets
+from securedrop.status_packets import StatusPackets
 from securedrop.utils import validate_and_normalize_email, sha256_file, sizeof_fmt
 
 DEFAULT_FILENAME = 'client.json'
@@ -85,7 +88,7 @@ class Client(ClientBase):
             print("Exiting SecureDrop")
             raise e
 
-    async def main(self):
+    async def main(self, server_cert_path="server.pem"):
         await super().main()
         try:
             if not self.users.users:
@@ -188,8 +191,11 @@ class Client(ClientBase):
         if msg != "":
             print("Failed to add contact: ", msg)
 
+    # Y
     async def check_for_file_transfer_requests(self):
+        # 2. `Y -> S`: every one second, Y asks server for any requests
         await self.write(bytes(FileTransferRequestResponsePackets()))
+        # 3. `S -> X/F -> Y`: server responds with active requests
         file_transfer_requests = FileTransferCheckRequestsPackets(data=(await self.read())[4:]).requests
 
         if file_transfer_requests:
@@ -217,16 +223,78 @@ class Client(ClientBase):
                 packets = FileTransferAcceptRequestPackets("")
                 accept = False
 
+            if accept:
+                while True:
+                    out_directory = input("Enter the output directory: ")
+                    if not os.path.isdir(out_directory):
+                        print("The path {} is not a directory".format(os.path.abspath(out_directory)))
+                    else:
+                        break
+
+            # 4. `Y -> Yes/No -> S`: Y accepts or denies transfer request
             await self.write(bytes(packets))
             if not accept:
                 return
 
-            sender_address = FileTransferExchangeAddressPackets(data=(await self.read())[4:]).address
-            print("Connecting to sender: {}".format(sender_address))
+            # 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
+            token = FileTransferSendTokenPackets(data=(await self.read())[4:]).token
 
+            lock = Lock()
+            progress = shared_memory.SharedMemory(create=True, size=8)
+            sentinel = shared_memory.SharedMemory(create=True, size=1)
+            listen_port = shared_memory.SharedMemory(create=True, size=4)
+
+            # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
+            p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name)
+            p2p_server_process = Process(target=p2p_server.run, args=(0, sentinel.name,))
+            p2p_server_process.start()
+
+            print("Started P2P server. Waiting for listen...")
+
+            # wait for listen
+            port = 0
+            while port == 0:
+                # lock.acquire(timeout=0.1)
+                port = int.from_bytes(listen_port.buf, byteorder='little')
+
+            await self.write(bytes(FileTransferSendPortPackets(port)))
+
+            # Wait until file received
+
+            time_start = time.time()
+
+            try:
+                while p2p_server_process.is_alive():
+                    # with lock:
+                    #     print("{}/{} chunks sent".format(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                    #                                      int.from_bytes(progress.buf[4:8], byteorder='little')))
+                    p2p_server_process.join(0.1)
+
+            except KeyboardInterrupt:
+                p2p_server_process.terminate()
+                raise RuntimeError("User requested abort")
+            finally:
+                sentinel.buf[0] = 1
+                p2p_server_process.join(0.5)
+                if p2p_server_process.is_alive():
+                    p2p_server_process.terminate()
+                progress.close()
+                progress.unlink()
+                sentinel.close()
+                sentinel.unlink()
+                listen_port.close()
+                listen_port.unlink()
+
+                time_end = time.time()
+
+            print("File transfer completed successfully in {} seconds.".format(time_end - time_start))
+
+    # X
     async def send_file(self):
         msg = None
         try:
+            # 1. `X -> Y/F -> S`: X wants to send F to Y
+
             recipient_email = input("Enter the recipient's email address: ")
             file_path = os.path.abspath(input("Enter the file path: "))
             valid_email = validate_and_normalize_email(recipient_email)
@@ -237,10 +305,12 @@ class Client(ClientBase):
             if not os.path.exists(file_path):
                 raise RuntimeError("Cannot find file: {}".format(file_path))
 
+            file_size = os.path.getsize(file_path)
+            file_sha256 = sha256_file(file_path)
             file_info = {
                 "name": os.path.basename(file_path),
-                "size": os.path.getsize(file_path),
-                "SHA256": sha256_file(file_path),
+                "size": file_size,
+                "SHA256": file_sha256,
             }
 
             await self.write(bytes(FileTransferRequestPackets(valid_email, file_info)))
@@ -249,11 +319,43 @@ class Client(ClientBase):
             if msg != "":
                 raise RuntimeError(msg)
 
-            recipient_address = FileTransferExchangeAddressPackets(data=(await self.read())[4:]).address
-            if not recipient_address:
+            # 7. `S -> Token/Port -> X`: S sends the same token and port to X
+            port_and_token = FileTransferSendPortTokenPackets(data=(await self.read())[4:])
+            port, token = port_and_token.port, port_and_token.token
+            if not token:
                 raise RuntimeError("User {} declined the file transfer".format(valid_email))
 
-            print("Connecting to recipient: {}".format(recipient_address))
+            print("Connecting to recipient on port ", port)
+
+            progress = shared_memory.SharedMemory(create=True, size=8)
+            progress_lock = Lock()
+            p2p_client = P2PClient(port, token, file_path, file_size, file_sha256, progress.name,
+                                   progress_lock)
+            p2p_client_process = Process(target=p2p_client.run)
+            p2p_client_process.start()
+
+            time_start = time.time()
+
+            try:
+                while p2p_client_process.is_alive():
+                    # with progress_lock:
+                    #     print("{}/{} chunks sent".format(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                    #                                      int.from_bytes(progress.buf[4:8], byteorder='little')))
+                    p2p_client_process.join(1)
+
+            except KeyboardInterrupt:
+                p2p_client_process.terminate()
+                raise RuntimeError("User requested abort")
+            finally:
+                if p2p_client_process.is_alive():
+                    p2p_client_process.terminate()
+                progress.close()
+                progress.unlink()
+
+                time_end = time.time()
+
+            print("File transfer completed in {} seconds.".format(time_end - time_start))
+
         except RuntimeError as e:
             msg = str(e)
         if msg != "":
@@ -261,6 +363,8 @@ class Client(ClientBase):
 
 
 def main(hostname=None, port=None, filename=None):
+    nest_asyncio.apply()
+
     hostname = hostname if hostname is not None else DEFAULT_HOSTNAME
     port = port if port is not None else DEFAULT_PORT
     filename = filename if filename is not None else DEFAULT_FILENAME

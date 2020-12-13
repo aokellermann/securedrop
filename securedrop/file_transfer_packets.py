@@ -1,3 +1,4 @@
+import base64
 import json
 
 # ****************************************************************
@@ -15,8 +16,7 @@ import json
 # 2. `Y -> S`: every one second, Y asks server for any requests
 # 3. `S -> X/F -> Y`: server responds with active requests
 # 4. `Y -> Yes/No -> S`: Y accepts or denies transfer request
-# 5(a). `S -> Token -> Y`: if Y accepted, server sends a unique token Y
-# 5(b). `S -> EmptyToken -> X`: if Y denied, server notifies X of denial (empty token)
+# 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
 # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
 # 7. `S -> Token/Port -> X`: S sends the same token and port to X
 
@@ -105,10 +105,9 @@ class FileTransferAcceptRequestPackets:
         return FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
 
 
-# 5(a). `S -> Token -> Y`: if Y accepted, server sends a unique token Y
-# 5(b). `S -> EmptyToken -> X`: if Y denied, server notifies X of denial (empty token)
+# 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
 
-FILE_TRANSFER_SEND_TOKEN_PACKETS_NAME = b"FTEA"
+FILE_TRANSFER_SEND_TOKEN_PACKETS_NAME = b"FTST"
 
 
 class FileTransferSendTokenPackets:
@@ -118,10 +117,10 @@ class FileTransferSendTokenPackets:
         self.jdict = dict()
         if data is not None:
             self.jdict = json.loads(data)
-            self.token = self.jdict["token"]
+            self.token = base64.b64decode(self.jdict["token"])
         elif token is not None:
             self.jdict = {
-                "token": self.token,
+                "token": str(base64.b64encode(self.token), encoding='ascii'),
             }
 
     def __bytes__(self):
@@ -147,7 +146,7 @@ class FileTransferSendPortPackets:
             }
 
     def __bytes__(self):
-        return FILE_TRANSFER_SEND_TOKEN_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
+        return FILE_TRANSFER_SEND_PORT_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
 
 
 # 7. `S -> Token/Port -> X`: S sends the same token and port to X
@@ -162,15 +161,15 @@ class FileTransferSendPortTokenPackets:
         self.jdict = dict()
         if data is not None:
             self.jdict = json.loads(data)
-            self.port, self.token = self.jdict["port"], self.jdict["token"]
+            self.port, self.token = self.jdict["port"], base64.b64decode(self.jdict["token"])
         elif port is not None and token is not None:
             self.jdict = {
                 "port": self.port,
-                "token": self.token,
+                "token": str(base64.b64encode(self.token), encoding='ascii'),
             }
 
     def __bytes__(self):
-        return FILE_TRANSFER_SEND_TOKEN_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
+        return FILE_TRANSFER_SEND_PORT_TOKEN_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
 
 
 # Part 2: Transfer Protocol
@@ -187,11 +186,11 @@ class FileTransferP2PFileInfoPackets:
         self.jdict = dict()
         if data is not None:
             self.jdict = json.loads(data)
-            self.file_info, self.token = token = self.jdict["file_info"], self.jdict["token"]
+            self.file_info, self.token = self.jdict["file_info"], base64.b64decode(self.jdict["token"])
         elif file_info is not None and token is not None:
             self.jdict = {
                 "file_info": self.file_info,
-                "token": self.token,
+                "token": str(base64.b64encode(self.token), encoding='ascii'),
             }
 
     def __bytes__(self):

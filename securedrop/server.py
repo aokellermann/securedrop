@@ -19,7 +19,8 @@ from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactP
 from securedrop.file_transfer_packets import FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME, FileTransferRequestPackets, \
     FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME, FILE_TRANSFER_CHECK_REQUESTS_RESPONSE_PACKETS_NAME, \
     FileTransferCheckRequestsPackets, FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME, FileTransferAcceptRequestPackets, \
-    FileTransferExchangeAddressPackets
+    FileTransferSendTokenPackets, FILE_TRANSFER_SEND_PORT_PACKETS_NAME, FileTransferSendPortPackets, \
+    FileTransferSendPortTokenPackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
@@ -204,6 +205,7 @@ class Server(ServerBase):
         self.sock_to_email = dict()
         self.sock_to_address = dict()
         self.file_transfer_requests = dict()
+        self.file_transfer_recipients = dict()
         super().__init__()
 
     async def on_data_received(self, data, stream):
@@ -225,6 +227,8 @@ class Server(ServerBase):
             await self.send_active_file_transfer_requests(stream)
         elif prefix == FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME:
             await self.process_file_transfer_request_accept(FileTransferAcceptRequestPackets(data=data), stream)
+        elif prefix == FILE_TRANSFER_SEND_PORT_PACKETS_NAME:
+            await self.process_file_transfer_received_port(FileTransferSendPortPackets(data=data), stream)
 
     async def on_stream_accepted(self, stream, address):
         self.sock_to_address[stream] = address
@@ -261,6 +265,7 @@ class Server(ServerBase):
         msg = self.users.add_contact(self.sock_to_email[stream], addc.name, addc.email)
         await self.write_status(stream, msg)
 
+    # 1. `X -> Y/F -> S`: X wants to send F to Y
     async def process_file_transfer_request(self, ftrp, stream):
         sender_email = self.sock_to_email[stream]
         recipient_email = ftrp.recipient_email
@@ -278,24 +283,37 @@ class Server(ServerBase):
             self.file_transfer_requests[recipient_email][self.sock_to_email[stream]] = ftrp.file_info
         await self.write_status(stream, msg)
 
+    # 2. `Y -> S`: every one second, Y asks server for any requests
+    # 3. `S -> X/F -> Y`: server responds with active requests
     async def send_active_file_transfer_requests(self, stream):
         email = self.sock_to_email[stream]
         requests = self.file_transfer_requests[email] if email in self.file_transfer_requests else dict()
         await self.write(stream, bytes(FileTransferCheckRequestsPackets(requests)))
 
+    # 5(a). `S -> Token -> Y`: if Y accepted, server sends a unique token Y
+    # 5(b). `S -> EmptyToken -> X`: if Y denied, server notifies X of denial (empty token)
     async def process_file_transfer_request_accept(self, ftar, stream):
         deny = not ftar.sender_email
-        recipient_address = self.sock_to_address[stream][0] if not deny else ""
+        token = get_random_bytes(32) if not deny else b""
         if deny:
             for sender_email in self.file_transfer_requests[self.sock_to_email[stream]].keys():
                 await self.write(self.email_to_sock[sender_email],
-                                 bytes(FileTransferExchangeAddressPackets(recipient_address)))
+                                 bytes(FileTransferSendTokenPackets(token)))
             del self.file_transfer_requests[self.sock_to_email[stream]]
         else:
+            del self.file_transfer_requests[self.sock_to_email[stream]][ftar.sender_email]
             sender_sock = self.email_to_sock[ftar.sender_email]
-            sender_address = self.sock_to_address[sender_sock][0]
-            await self.write(stream, bytes(FileTransferExchangeAddressPackets(sender_address)))
-            await self.write(sender_sock, bytes(FileTransferExchangeAddressPackets(recipient_address)))
+            self.file_transfer_recipients[stream] = {
+                "token": token,
+                "sender": sender_sock
+            }
+            await self.write(stream, bytes(FileTransferSendTokenPackets(token)))
+
+    # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
+    # 7. `S -> Token/Port -> X`: S sends the same token and port to X
+    async def process_file_transfer_received_port(self, ftsp, stream):
+        recipient = self.file_transfer_recipients[stream]
+        await self.write(recipient["sender"], bytes(FileTransferSendPortTokenPackets(ftsp.port, recipient["token"])))
 
 
 class ServerDriver:
