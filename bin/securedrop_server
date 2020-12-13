@@ -5,7 +5,6 @@ from securedrop.utils import VerbosePrinter
 from securedrop import server
 import sys
 
-
 if __name__ == "__main__":
     home_dir = os.getenv("HOME")
     if home_dir is None:

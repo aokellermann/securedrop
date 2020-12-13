@@ -20,7 +20,6 @@ async def write(stream, data: bytes):
 
 
 class ClientBase:
-
     def __init__(self, host, port):
         super().__init__()
         self.stream = None
