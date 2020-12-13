@@ -147,9 +147,12 @@ class Client(ClientBase):
         try:
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
+            prompt = True
             while True:
-                print("secure_drop> ", end="", flush=True)
-                if select.select([sys.stdin], [], [], 5)[0]:
+                if prompt:
+                    print("secure_drop> ", end="", flush=True)
+                    prompt = False
+                if select.select([sys.stdin], [], [], 1)[0]:
                     cmd = input()
                     if cmd == "help":
                         print("\"add\"  \t-> Add a new contact")
@@ -164,6 +167,7 @@ class Client(ClientBase):
                         await self.send_file()
                     elif cmd == "exit":
                         break
+                    prompt = True
 
                 await self.check_for_file_transfer_requests()
 
