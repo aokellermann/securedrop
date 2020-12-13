@@ -5,6 +5,7 @@ from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
 from tornado.tcpserver import TCPServer
+from tornado.netutil import bind_sockets
 from multiprocessing import shared_memory
 
 MESSAGE_SENTINEL = b"\n" * 2
@@ -64,11 +65,22 @@ class ServerBase(TCPServer):
             ssl_ctx.load_cert_chain(cert_path)
         super().__init__(ssl_options=ssl_ctx)
         self.shm = None
+        self.listen_ports = set()
+
+    def listen(self, port: int, address: str = ""):
+        # this essentially calls self.listen(port), but stores the listening ports for posterity
+        socks = bind_sockets(port)
+        self.add_sockets(socks)
+        self.listen_ports = {sock.getsockname()[1] for sock in socks}
 
     def run(self, port, shm_name):
         print("Server starting")
         self.shm = shared_memory.SharedMemory(shm_name)
-        self.listen(port)
+
+        # only listen() once!
+        if not self.listen_ports:
+            self.listen(port)
+
         print("Server starting main loop")
         try:
             PeriodicCallback(self.check_stop, 100).start()
