@@ -17,13 +17,20 @@ python ./scripts/setup.py build
 python ./scripts/setup.py install
 ```
 ## Usage
-### Running the server
+
+### Running with no executable arguments
+
+#### Running the server
 ```bash
 PYTHONPATH=$PYTHONPATH:. ./bin/securedrop_server
 ```
-### Running the client
+#### Running the client
 ```bash
 PYTHONPATH=$PYTHONPATH:. ./bin/securedrop
+```
+### Running with executable arguments
+```bash
+PYTHONPATH=$PYTHONPATH:. ./bin/securedrop_server 
 ```
 
 ## Contributing
