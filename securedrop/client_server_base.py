@@ -24,6 +24,7 @@ class ClientBase:
         super().__init__()
         self.stream = None
         self.host = host
+        self.port = port
 
     def run(self, timeout=None):
         print("Client starting main loop")
