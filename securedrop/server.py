@@ -21,6 +21,8 @@ from securedrop.file_transfer_packets import FILE_TRANSFER_REQUEST_TRANSFER_PACK
     FileTransferCheckRequestsPackets, FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME, FileTransferAcceptRequestPackets, \
     FileTransferSendTokenPackets, FILE_TRANSFER_SEND_PORT_PACKETS_NAME, FileTransferSendPortPackets, \
     FileTransferSendPortTokenPackets
+from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
+from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
@@ -197,6 +199,12 @@ class RegisteredUsers:
         user = self.users[email1_hash]
         return user.contacts and valid_contact_email2 in user.contacts
 
+    def get_contacts(self, email):
+        if not email:
+            return "Invalid email address"
+        email_hash = SHA256.new(email.encode()).hexdigest()
+        return self.users[email_hash].contacts if email_hash in self.users else dict()
+
 
 class Server(ServerBase):
     def __init__(self, filename):
@@ -221,6 +229,8 @@ class Server(ServerBase):
             await self.process_login(LoginPackets(data=data), stream)
         elif prefix == ADD_CONTACT_PACKETS_NAME:
             await self.add_contact(AddContactPackets(data=data), stream)
+        elif prefix == LIST_CONTACTS_PACKETS_NAME:
+            await self.list_contacts(stream)
         elif prefix == FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME:
             await self.process_file_transfer_request(FileTransferRequestPackets(data=data), stream)
         elif prefix == FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME:
@@ -245,6 +255,9 @@ class Server(ServerBase):
     async def write_status(self, stream, msg):
         await self.write(stream, bytes(StatusPackets(msg)))
 
+    async def write_list_contacts_response(self, stream, contacts_dict):
+        await self.write(stream, bytes(ListContactsResponsePackets(contacts_dict)))
+
     async def process_register(self, reg, stream):
         msg = self.users.register_new_user(reg.name, reg.email, reg.password)
         if msg == "":
@@ -264,6 +277,21 @@ class Server(ServerBase):
     async def add_contact(self, addc, stream):
         msg = self.users.add_contact(self.sock_to_email[stream], addc.name, addc.email)
         await self.write_status(stream, msg)
+
+    async def list_contacts(self, stream):
+        # three verification steps
+        current_user_email = self.sock_to_email[stream]
+        # 1: contacts_dict contains the names and email adresses that a user has added
+        contacts_dict = self.users.get_contacts(current_user_email)
+        contacts_dict_send = dict()
+
+        for email, name in contacts_dict.items():
+            # 2: check if a user's contacts have also added the current user as a contact.
+            # 3: check if the user is online.
+            if email in self.email_to_sock and current_user_email in self.users.get_contacts(email):
+                contacts_dict_send[email] = name
+
+        await self.write_list_contacts_response(stream, contacts_dict_send)
 
     # 1. `X -> Y/F -> S`: X wants to send F to Y
     async def process_file_transfer_request(self, ftrp, stream):

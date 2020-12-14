@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 import securedrop.client as client
+from securedrop.client import LIST_CONTACTS_TEST_FILENAME
 from securedrop.server import ServerDriver, Server, DEFAULT_filename, AESWrapper
 import json
 import time
@@ -252,7 +253,20 @@ class TestRegistration(unittest.TestCase):
                         self.assertEqual("name_v_2", contacts["email_v_2@test.com"])
                         self.assertEqual("name_v_3", contacts["email_v_3@test.com"])
 
-    def test_aap_login_correct_password_decrypt_contact(self):
+    def test_aap_list_contacts_empty_dictionary(self):
+        """Ensures that does not list users if no users have been added"""
+        with server_process():
+            se1 = InputSideEffect(["email_v@test.com", "list", "exit"])
+            se2 = InputSideEffect(["password_v12"])
+            with patch('builtins.input', side_effect=se1.se):
+                with patch('getpass.getpass', side_effect=se2.se):
+                    client.main(None, None, None, True)
+                    with open(LIST_CONTACTS_TEST_FILENAME, 'r') as f:
+                        jdict = json.load(f)
+                        is_empty = not bool(jdict)
+                        self.assertTrue(is_empty)
+
+    def test_aaq_login_correct_password_decrypt_contact(self):
         """Ensures that client logs in successfully with correct email/password Then decrypts contacts."""
         server = Server(DEFAULT_filename)
         user = server.users.users["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]
@@ -263,7 +277,7 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(user.contacts["email_v_2@test.com"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3@test.com"], "name_v_3")
 
-    def test_aaq_data_in_memory_after_decrypt(self):
+    def test_aar_data_in_memory_after_decrypt(self):
         """Ensures that Client data can be accessed in local memory after decryption"""
         server = Server(DEFAULT_filename)
         user = server.users.users["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]
@@ -273,7 +287,7 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(user.contacts["email_v_2@test.com"], "name_v_2")
         self.assertEqual(user.contacts["email_v_3@test.com"], "name_v_3")
 
-    def test_aar_test_decrypt_wrong_password(self):
+    def test_aas_test_decrypt_wrong_password(self):
         """Ensures that client throws an error when decryption is not successful (wrong key)."""
         server = Server(DEFAULT_filename)
         user = server.users.users["e908de13f0f86b9c15f70d34cc1a5696280b3fbf822ae09343a779b19a3214b7"]
