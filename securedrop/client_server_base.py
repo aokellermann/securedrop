@@ -106,6 +106,7 @@ class ServerBase(TCPServer):
     async def handle_stream(self, stream, address):
         log.info("Server accepted connection at host {}".format(address))
         await stream.wait_for_handshake()
+        await self.on_stream_accepted(stream, address)
         while True:
             try:
                 data = await read(stream)
