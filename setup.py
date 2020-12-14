@@ -6,7 +6,7 @@ from setuptools import setup
 setup(
     name='securedrop',
     version='1.0',
-    packages=find_packages(),
+    packages=find_packages(include=["securedrop"]),
     url='https://github.com/aokellermann/securedrop',
     license='MIT License',
     author='Antony Kellermann',
@@ -28,5 +28,6 @@ setup(
         'tornado>=6.1',
         'urllib3>=1.26.2',
     ],
-    scripts=["bin/securedrop", "bin/securedrop_server"]
+    scripts=["bin/securedrop", "bin/securedrop_server"],
+    platforms="linux"
 )
