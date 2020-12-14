@@ -19,7 +19,7 @@ if __name__ == "__main__":
     securedrop_port = None
     verboseFlag = False
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "pfv", ["port", "filename", "verbose"])
+        opts, args = getopt.getopt(sys.argv[1:], "p:f:v", ["port=", "filename=", "verbose"])
     except getopt.GetoptError as err:
         print(err)  # will print something like "option -a not recognized"
         sys.exit(2)
