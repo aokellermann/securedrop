@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import getopt
-import logging as log
 import os
 import sys
-from securedrop import client
+from securedrop import client, utils
 
 if __name__ == "__main__":
     home_dir = os.getenv("HOME")
@@ -35,8 +34,6 @@ if __name__ == "__main__":
             verboseFlag = True
         else:
             raise RuntimeError("Unhandled argument found.")
-    if verboseFlag:
-        log.basicConfig(format="%(message)s", level=log.DEBUG)
-    else:
-        log.basicConfig(format="%(message)s", level=log.INFO)
+
+    utils.create_logger(verboseFlag)
     client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_hostname)

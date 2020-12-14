@@ -1,11 +1,13 @@
 import ssl
 
-import logging as log
+from logging import getLogger
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
 from tornado.tcpserver import TCPServer
 from multiprocessing import shared_memory
+
+log = getLogger('securedrop')
 
 
 async def read(stream):
@@ -44,12 +46,12 @@ class ClientBase:
 
     async def read(self):
         data = await read(self.stream)
-        log.debug("Client read bytes: ", data[:80])
+        log.debug("Client read bytes: {}".format(data[:80]))
         return data
 
     async def write(self, data: bytes):
         await write(self.stream, data)
-        log.debug("Client wrote bytes: ", data[:80])
+        log.debug("Client wrote bytes: {}".format(data[:80]))
 
 
 class ServerBase(TCPServer):
@@ -77,19 +79,19 @@ class ServerBase(TCPServer):
             IOLoop.current().add_callback(IOLoop.current().stop)
 
     async def handle_stream(self, stream, address):
-        log.info("Server accepted connection at host ", address)
+        log.info("Server accepted connection at host {}".format(address))
         await stream.wait_for_handshake()
         while True:
             try:
                 data = await read(stream)
-                log.debug("Server read bytes: ", data[:80])
+                log.debug("Server read bytes: {}".format(data[:80]))
                 await self.on_data_received(data, stream)
             except StreamClosedError:
-                log.info("Server lost client at host ", address)
+                log.info("Server lost client at host {}".format(address))
                 await self.on_stream_closed(stream)
                 break
             except Exception as e:
-                log.error("Server caught exception: ", e)
+                log.error("Server caught exception: {}".format(e))
 
     async def on_data_received(self, data, stream):
         pass
@@ -99,4 +101,4 @@ class ServerBase(TCPServer):
 
     async def write(self, stream, data: bytes):
         await write(stream, data)
-        log.debug("Server wrote bytes: ", data[:80])
+        log.debug("Server wrote bytes: {}".format(data[:80]))

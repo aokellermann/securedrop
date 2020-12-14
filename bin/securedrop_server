@@ -2,7 +2,7 @@
 import getopt
 import logging as log
 import os
-from securedrop import server
+from securedrop import server, utils
 import sys
 
 if __name__ == "__main__":
@@ -32,8 +32,6 @@ if __name__ == "__main__":
             verboseFlag = True
         else:
             raise RuntimeError("Unhandled argument found.")
-    if verboseFlag:
-        log.basicConfig(format="%(message)s", level=log.DEBUG)
-    else:
-        log.basicConfig(format="%(message)s", level=log.INFO)
+
+    utils.create_logger(verboseFlag)
     server.main(filename=securedrop_file, port=securedrop_port)

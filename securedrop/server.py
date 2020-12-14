@@ -10,7 +10,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHAKE256, SHA256, SHA512
 from Crypto.Protocol.KDF import PBKDF2
 import Crypto.Util.Padding
-import logging as log
+from logging import getLogger
 
 from securedrop import ServerBase
 from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
@@ -24,6 +24,8 @@ from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
 DEFAULT_PORT = 6969
+
+log = getLogger('securedrop')
 
 
 def make_salt():
@@ -235,7 +237,7 @@ class Server(ServerBase):
         if msg == "":
             self.email_to_sock[reg.email] = stream
             self.sock_to_email[stream] = reg.email
-            log.info("added ", reg.email, " to online connections")
+            log.info("added {} to online connections".format(reg.email))
         await self.write_status(stream, msg)
 
     async def process_login(self, login, stream):
@@ -243,7 +245,7 @@ class Server(ServerBase):
         if msg == "":
             self.email_to_sock[login.email] = stream
             self.sock_to_email[stream] = login.email
-            log.info("added ", login.email, " to online connections")
+            log.info("added {} to online connectionds".format(login.email))
         await self.write_status(stream, msg)
 
     async def add_contact(self, addc, stream):
