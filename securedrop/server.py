@@ -364,8 +364,10 @@ class ServerDriver:
         try:
             server = Server(self.filename)
             server.run(self.port, self.sentinel_name())
-        except Exception:
-            log.error("Caught exception. Exiting...")
+        except KeyboardInterrupt:
+            log.info("Caught KeyboardInterrupt. Exiting.")
+        except:
+            log.error("Caught exception. Exiting.")
         finally:
             self.sentinel.buf[0] = 1
 

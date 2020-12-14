@@ -47,7 +47,10 @@ class ClientBase:
             ssl_ctx.load_verify_locations(self.server_cert_path)
             ssl_ctx.load_cert_chain(self.server_cert_path)
         ssl_ctx.check_hostname = False
-        self.stream = await TCPClient().connect(self.host, self.port, ssl_options=ssl_ctx)
+        try:
+            self.stream = await TCPClient().connect(self.host, self.port, ssl_options=ssl_ctx)
+        except StreamClosedError:
+            raise RuntimeError("Can't connect to server at {}".format((self.host, self.port)))
         log.debug("Client connected to {}".format((self.host, self.port)))
 
     async def read(self):
@@ -88,6 +91,9 @@ class ServerBase(TCPServer):
         try:
             PeriodicCallback(self.check_stop, 100).start()
             IOLoop.current().start()
+        except:
+            # this is necessary because parent try/catch can't catch anything here for some reason
+            raise
         finally:
             self.shm.close()
             self.shm = None

@@ -99,8 +99,9 @@ class Client(ClientBase):
             raise e
 
     async def main(self, server_cert_path="server.pem"):
-        await super().main()
         try:
+            await super().main()
+
             if not self.users.users:
                 decision = input(
                     "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
@@ -118,9 +119,9 @@ class Client(ClientBase):
                     await self.sh()
                 else:
                     raise RuntimeError("Login failed.")
-        except Exception as e:
+        except RuntimeError as e:
+            print(e)
             print("Exiting SecureDrop")
-            raise e
 
     async def register(self):
         msg, email = None, None
@@ -163,7 +164,7 @@ class Client(ClientBase):
                     print("secure_drop> ", end="", flush=True)
                     prompt = False
                 if select.select([sys.stdin], [], [], 1)[0]:
-                    cmd = input()
+                    cmd = input().strip()
                     if cmd == "help":
                         print("\"add\"  \t-> Add a new contact")
                         print("\"list\"  \t-> List all online contacts")
@@ -177,6 +178,8 @@ class Client(ClientBase):
                         await self.send_file()
                     elif cmd == "exit":
                         break
+                    else:
+                        print("Unknown command: {}".format(cmd))
                     prompt = True
 
                 if (await self.check_for_file_transfer_requests()) is not None:
