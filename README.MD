@@ -29,8 +29,13 @@ PYTHONPATH=$PYTHONPATH:. ./bin/securedrop_server
 PYTHONPATH=$PYTHONPATH:. ./bin/securedrop
 ```
 ### Running with executable arguments
+#### Running the server
 ```bash
-PYTHONPATH=$PYTHONPATH:. ./bin/securedrop_server 
+PYTHONPATH=$PYTHONPATH:. ./bin/securedrop_server --port 6789 
+```
+#### Running the client
+```bash
+PYTHONPATH=$PYTHONPATH:. ./bin/securedrop --port 6789 
 ```
 
 ## Contributing
