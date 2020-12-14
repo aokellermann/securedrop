@@ -25,7 +25,7 @@ setup(
         'requests>=2.25.0',
         'securedrop>=1.0',
         'shellescape>=3.8.1',
-        'tornado>=6.1'
+        'tornado>=6.1',
         'urllib3>=1.26.2',
         'yapf>=0.30.0'
     ],
