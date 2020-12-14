@@ -1,3 +1,4 @@
+import math
 import os
 
 from Crypto.Hash import SHA256
@@ -18,10 +19,20 @@ def sha256_file(path: str):
     if not os.path.exists(path):
         return None
 
+    chunk_size = 256 * 16
+    total_chunks = os.path.getsize(path) / math.ceil(chunk_size)
+    chunks_so_far = 0
+
+    def print_hash_progress():
+        print_status(*get_progress(chunks_so_far, total_chunks, chunk_size), "hashed")
+
+    print_hash_progress()
     with open(path, "rb") as file:
         hasher = SHA256.new()
-        while chunk := file.read(256 * 16):
+        while chunk := file.read(chunk_size):
             hasher.update(chunk)
+            chunks_so_far += 1
+            print_hash_progress()
 
         return hasher.hexdigest()
 
@@ -51,3 +62,14 @@ def set_logger(verbose):
 
     # add ch to logger
     logger.addHandler(ch)
+
+
+def get_progress(chunks_so_far, total_chunks, chunk_size):
+    chunks_so_far *= chunk_size
+    total_chunks *= chunk_size
+    percent = 100 * (chunks_so_far / total_chunks) if total_chunks else 0
+    return sizeof_fmt(chunks_so_far), sizeof_fmt(total_chunks), "{}%".format(int(percent))
+
+
+def print_status(progress, total, percent, verb):
+    print("{}/{} {} ({})".format(progress, total, verb, percent), end='\r', flush=True)
