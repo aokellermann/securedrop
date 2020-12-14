@@ -38,8 +38,20 @@ PYTHONPATH=$PYTHONPATH:. ./bin/securedrop
 ./bin/securedrop --port 6789 --address 127.0.0.1 -f example_file_2.json --verbose 
 ```
 
-## Contributing
-To read more about the design and security features used in this project see the [contributing file](CONTRIBUTING.MD).
+## Code
+### Important Files
+
+### Modularity
+The project (with its extensive use of classes) takes an object oriented approach to solving key problems. 
+As an example of code reusability, see the conventions for the ‘packet’ classes. 
+### Readability
+The project includes a script (format.sh) which executes the YAPF formatter to maintain a uniform style.
+Our team has also engaged in code reviews to maintain good code quality.
+### Testing
+Securedrop has also been thoroughly tested. From project root, unit tests can be found in the 
+./securedrop/tests directory.  
+
+## Security
 
 ## License
 [MIT](LICENSE)
