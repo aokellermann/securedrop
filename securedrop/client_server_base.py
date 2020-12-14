@@ -7,7 +7,7 @@ from tornado.tcpclient import TCPClient
 from tornado.tcpserver import TCPServer
 from multiprocessing import shared_memory
 
-log = getLogger('securedrop')
+log = getLogger()
 
 
 async def read(stream):

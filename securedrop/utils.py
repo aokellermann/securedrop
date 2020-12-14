@@ -13,7 +13,7 @@ def validate_and_normalize_email(email):
 
 def create_logger(verbose):
     # create logger
-    logger = logging.getLogger('securedrop')
+    logger = logging.getLogger()
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)
 
     # create console handler and set level to debug

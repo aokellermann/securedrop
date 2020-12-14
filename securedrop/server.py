@@ -25,7 +25,7 @@ from securedrop.utils import validate_and_normalize_email
 DEFAULT_filename = 'server.json'
 DEFAULT_PORT = 6969
 
-log = getLogger('securedrop')
+log = getLogger()
 
 
 def make_salt():
@@ -224,7 +224,7 @@ class Server(ServerBase):
         email = self.sock_to_email[stream]
         del self.sock_to_email[stream]
         del self.email_to_sock[email]
-        log.info("removed ", email, " from online connections")
+        log.info("removed {} from online connections".format(email))
 
     async def write_status(self, stream, msg):
         await self.write(stream, bytes(StatusPackets(msg)))
