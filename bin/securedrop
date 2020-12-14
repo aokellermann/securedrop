@@ -20,7 +20,7 @@ if __name__ == "__main__":
     securedrop_hostname = None
     verbose_flag = False
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "pafv", ["port", "address", "filename", "verbose"])
+        opts, args = getopt.getopt(sys.argv[1:], "p:a:f:v", ["port=", "address=", "filename=", "verbose"])
     except getopt.GetoptError as err:
         print(err)  # will print something like "option -a not recognized"
         sys.exit(2)
