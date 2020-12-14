@@ -30,5 +30,5 @@ if __name__ == "__main__":
         elif o in ("-v", "--verbose"):
             log.basicConfig(format="%(message)s", level=log.DEBUG)
         else:
-            assert False, "unhandled option"
+            raise RuntimeError("Unhandled argument found.")
     server.main(filename=securedrop_file, port=securedrop_port)
