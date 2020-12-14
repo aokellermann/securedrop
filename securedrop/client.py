@@ -200,116 +200,117 @@ class Client(ClientBase):
     async def check_for_file_transfer_requests(self):
         # 2. `Y -> S`: every one second, Y asks server for any requests
         await self.write(bytes(FileTransferRequestResponsePackets()))
+
         # 3. `S -> X/F -> Y`: server responds with active requests
         file_transfer_requests = FileTransferCheckRequestsPackets(data=(await self.read())[4:]).requests
+        if not file_transfer_requests:
+            return
 
-        if file_transfer_requests:
-            print("Incoming file transfer request(s):")
-            index_to_email = dict()
-            i = 1
-            for email, file_info in file_transfer_requests.items():
-                print("\t{}. {}".format(i, email))
-                print("\t\tname: ", file_info["name"])
-                print("\t\tsize: ", sizeof_fmt(int(file_info["size"])))
-                print("\t\tSHA256: ", file_info["SHA256"])
-                index_to_email[i] = email
-                i += 1
+        print("Incoming file transfer request(s):")
+        index_to_email = dict()
+        i = 1
+        for email, file_info in file_transfer_requests.items():
+            print("\t{}. {}".format(i, email))
+            print("\t\tname: ", file_info["name"])
+            print("\t\tsize: ", sizeof_fmt(int(file_info["size"])))
+            print("\t\tSHA256: ", file_info["SHA256"])
+            index_to_email[i] = email
+            i += 1
 
-            print()
-            selection = input("Enter the number for which request you'd like to accept, or 0 to deny all: ")
-            try:
-                accept = True
-                selection_num = int(selection)
-                if selection_num <= 0 or selection_num >= i:
-                    raise ValueError
+        try:
+            selection = input("\nEnter the number for which request you'd like to accept, or 0 to deny all: ")
+            accept = True
+            selection_num = int(selection)
+            if selection_num <= 0 or selection_num >= i:
+                raise ValueError
 
-                packets = FileTransferAcceptRequestPackets(index_to_email[selection_num])
-            except ValueError:
-                packets = FileTransferAcceptRequestPackets("")
-                accept = False
+            packets = FileTransferAcceptRequestPackets(index_to_email[selection_num])
+        except ValueError or KeyboardInterrupt:
+            packets = FileTransferAcceptRequestPackets("")
+            accept = False
 
-            if accept:
-                while True:
-                    out_directory = input("Enter the output directory: ")
-                    if not os.path.isdir(out_directory):
-                        print("The path {} is not a directory".format(os.path.abspath(out_directory)))
-                    else:
-                        break
+        if accept:
+            while True:
+                out_directory = input("Enter the output directory: ")
+                if not os.path.isdir(out_directory):
+                    print("The path {} is not a directory".format(os.path.abspath(out_directory)))
+                else:
+                    break
 
-            # 4. `Y -> Yes/No -> S`: Y accepts or denies transfer request
-            await self.write(bytes(packets))
-            if not accept:
-                return False
+        # 4. `Y -> Yes/No -> S`: Y accepts or denies transfer request
+        await self.write(bytes(packets))
+        if not accept:
+            return False
 
-            # 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
-            token = FileTransferSendTokenPackets(data=(await self.read())[4:]).token
+        # 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
+        token = FileTransferSendTokenPackets(data=(await self.read())[4:]).token
 
-            lock = Lock()
-            progress = shared_memory.SharedMemory(create=True, size=8)
-            sentinel = shared_memory.SharedMemory(create=True, size=1)
-            listen_port = shared_memory.SharedMemory(create=True, size=4)
+        lock = Lock()
+        progress = shared_memory.SharedMemory(create=True, size=8)
+        sentinel = shared_memory.SharedMemory(create=True, size=1)
+        listen_port = shared_memory.SharedMemory(create=True, size=4)
 
-            # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
-            p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name)
-            p2p_server_process = Process(target=p2p_server.run, args=(
-                0,
-                sentinel.name,
-            ))
-            p2p_server_process.start()
+        # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
+        p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name)
+        p2p_server_process = Process(target=p2p_server.run, args=(
+            0,
+            sentinel.name,
+        ))
+        p2p_server_process.start()
 
-            print("Started P2P server. Waiting for listen...")
+        print("Started P2P server. Waiting for listen...")
 
-            # wait for listen
-            port = 0
-            while port == 0:
+        # wait for listen
+        port = 0
+        while port == 0:
+            with lock:
+                port = int.from_bytes(listen_port.buf, byteorder='little')
+
+        await self.write(bytes(FileTransferSendPortPackets(port)))
+
+        # Wait until file received
+
+        time_start = time.time()
+        status_sentinel = False
+
+        def get_progress():
+            chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
+            prog, total = int.from_bytes(progress.buf[0:4], byteorder='little') * chunk_size, \
+                          int.from_bytes(progress.buf[4:8], byteorder='little') * chunk_size
+            percent = 100 * (prog / total) if total else 0
+            return sizeof_fmt(prog), sizeof_fmt(total), "{}%".format(int(percent))
+
+        def print_status():
+            while not status_sentinel:
                 with lock:
-                    port = int.from_bytes(listen_port.buf, byteorder='little')
+                    prog, total, percent = get_progress()
+                    print("{}/{} received ({})".format(prog, total, percent), end='\r', flush=True)
+                time.sleep(0.1)
 
-            await self.write(bytes(FileTransferSendPortPackets(port)))
+        status_thread = Thread(target=print_status)
+        status_thread.start()
+        try:
+            p2p_server_process.join()
+        except KeyboardInterrupt:
+            raise RuntimeError("User requested abort")
+        finally:
+            if p2p_server_process.is_alive():
+                p2p_server_process.terminate()
+            status_sentinel = True
+            status_thread.join()
+            final_prog, final_total, final_percent = get_progress()
+            print("{}/{} received ({})".format(final_prog, final_total, final_percent))
+            progress.close()
+            progress.unlink()
+            sentinel.close()
+            sentinel.unlink()
+            listen_port.close()
+            listen_port.unlink()
 
-            # Wait until file received
+            time_end = time.time()
 
-            time_start = time.time()
-            status_sentinel = False
-
-            def get_progress():
-                chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
-                prog, total = int.from_bytes(progress.buf[0:4], byteorder='little') * chunk_size, \
-                              int.from_bytes(progress.buf[4:8], byteorder='little') * chunk_size
-                percent = 100 * (prog / total) if total else 0
-                return sizeof_fmt(prog), sizeof_fmt(total), "{}%".format(int(percent))
-
-            def print_status():
-                while not status_sentinel:
-                    with lock:
-                        prog, total, percent = get_progress()
-                        print("{}/{} received ({})".format(prog, total, percent), end='\r', flush=True)
-                    time.sleep(0.1)
-
-            status_thread = Thread(target=print_status)
-            status_thread.start()
-            try:
-                p2p_server_process.join()
-            except KeyboardInterrupt:
-                raise RuntimeError("User requested abort")
-            finally:
-                if p2p_server_process.is_alive():
-                    p2p_server_process.terminate()
-                status_sentinel = True
-                status_thread.join()
-                final_prog, final_total, final_percent = get_progress()
-                print("{}/{} received ({})".format(final_prog, final_total, final_percent))
-                progress.close()
-                progress.unlink()
-                sentinel.close()
-                sentinel.unlink()
-                listen_port.close()
-                listen_port.unlink()
-
-                time_end = time.time()
-
-            print("File transfer completed successfully in {} seconds.".format(time_end - time_start))
-            return True
+        print("File transfer completed successfully in {} seconds.".format(time_end - time_start))
+        return True
 
     # X
     async def send_file(self):
@@ -338,16 +339,21 @@ class Client(ClientBase):
                 "SHA256": file_sha256,
             }
 
+            # send request
             await self.write(bytes(FileTransferRequestPackets(valid_email, file_info)))
 
+            # this only checks if the request is valid
+            # this does not check if the recipient accepted or denied the request
             msg = StatusPackets(data=(await self.read())[4:]).message
             if msg != "":
                 raise RuntimeError(msg)
 
             # 7. `S -> Token/Port -> X`: S sends the same token and port to X
+
+            # denied request is indicated by empty token and port
             port_and_token = FileTransferSendPortTokenPackets(data=(await self.read())[4:])
             port, token = port_and_token.port, port_and_token.token
-            if token:
+            if token and port:
                 print("User {} accepted the file transfer Connecting to recipient on port ".format(valid_email, port))
             else:
                 raise RuntimeError("User {} declined the file transfer request".format(valid_email))
@@ -373,8 +379,11 @@ class Client(ClientBase):
                         print("{}/{} sent ({})".format(prog, total, percent), end='\r', flush=True)
                     time.sleep(0.1)
 
+            # i was having trouble with asyncio.gather, so just run status printer in a new thread
             status_thread = Thread(target=print_status)
             status_thread.start()
+
+            # wait until p2p transfer completes, unless keyboard interrupt
             try:
                 await p2p_client.main()
             except KeyboardInterrupt:

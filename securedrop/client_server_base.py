@@ -49,12 +49,12 @@ class ClientBase:
 
     async def read(self):
         data = await read(self.stream)
-        #print("Client read bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
+        print("Client read bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
         return data
 
     async def write(self, data: bytes):
         await write(self.stream, data)
-        #print("Client wrote bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
+        print("Client wrote bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
 
 
 class ServerBase(TCPServer):
@@ -102,7 +102,7 @@ class ServerBase(TCPServer):
         while True:
             try:
                 data = await read(stream)
-                #print("Server read bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
+                print("Server read bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
                 await self.on_data_received(data, stream)
             except StreamClosedError:
                 print("Server lost client at host ", address)
@@ -123,4 +123,4 @@ class ServerBase(TCPServer):
 
     async def write(self, stream, data: bytes):
         await write(stream, data)
-        #print("Server wrote bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
+        print("Server wrote bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))

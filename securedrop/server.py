@@ -290,14 +290,14 @@ class Server(ServerBase):
         requests = self.file_transfer_requests[email] if email in self.file_transfer_requests else dict()
         await self.write(stream, bytes(FileTransferCheckRequestsPackets(requests)))
 
-    # 5(a). `S -> Token -> Y`: if Y accepted, server sends a unique token Y
-    # 5(b). `S -> EmptyToken -> X`: if Y denied, server notifies X of denial (empty token)
+    # 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
+    # 7. `S -> Token/Port -> X`: S sends the same token and port to X
     async def process_file_transfer_request_accept(self, ftar, stream):
         deny = not ftar.sender_email
         token = get_random_bytes(32) if not deny else b""
         if deny:
             for sender_email in self.file_transfer_requests[self.sock_to_email[stream]].keys():
-                await self.write(self.email_to_sock[sender_email], bytes(FileTransferSendTokenPackets(token)))
+                await self.write(self.email_to_sock[sender_email], bytes(FileTransferSendPortTokenPackets(0, token)))
             del self.file_transfer_requests[self.sock_to_email[stream]]
         else:
             del self.file_transfer_requests[self.sock_to_email[stream]][ftar.sender_email]
