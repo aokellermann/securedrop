@@ -7,4 +7,3 @@ def validate_and_normalize_email(email):
         return valid.email
     except EmailNotValidError as e:
         print(str(e))
-
