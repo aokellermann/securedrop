@@ -119,8 +119,11 @@ class Client(ClientBase):
                     await self.sh()
                 else:
                     raise RuntimeError("Login failed.")
+        except KeyboardInterrupt:
+            pass
         except RuntimeError as e:
             print(e)
+        finally:
             print("Exiting SecureDrop")
 
     async def register(self):
@@ -184,8 +187,7 @@ class Client(ClientBase):
 
                 if (await self.check_for_file_transfer_requests()) is not None:
                     prompt = True
-
-        except Exception as e:
+        except Exception or KeyboardInterrupt as e:
             print("Exiting SecureDrop")
             raise e
 
