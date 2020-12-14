@@ -208,6 +208,7 @@ class Client(ClientBase):
 
         print("Incoming file transfer request(s):")
         index_to_email = dict()
+        index_to_file_info = dict()
         i = 1
         for email, file_info in file_transfer_requests.items():
             print("\t{}. {}".format(i, email))
@@ -215,6 +216,7 @@ class Client(ClientBase):
             print("\t\tsize: ", sizeof_fmt(int(file_info["size"])))
             print("\t\tSHA256: ", file_info["SHA256"])
             index_to_email[i] = email
+            index_to_file_info[i] = file_info
             i += 1
 
         try:
@@ -232,8 +234,11 @@ class Client(ClientBase):
         if accept:
             while True:
                 out_directory = input("Enter the output directory: ")
+                file_path = os.path.join(out_directory, index_to_file_info[selection_num]["name"])
                 if not os.path.isdir(out_directory):
                     print("The path {} is not a directory".format(os.path.abspath(out_directory)))
+                elif os.path.exists(file_path):
+                    print("The file {} already exists".format(file_path))
                 else:
                     break
 
