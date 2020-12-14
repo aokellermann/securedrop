@@ -38,7 +38,7 @@ class ClientBase:
         ssl_ctx.load_verify_locations('server.pem')
         ssl_ctx.load_cert_chain('server.pem')
         ssl_ctx.check_hostname = False
-        self.stream = await TCPClient().connect('127.0.0.1', self.port, ssl_options=ssl_ctx)
+        self.stream = await TCPClient().connect(self.host, self.port, ssl_options=ssl_ctx)
         print("Client connected")
 
     async def read(self):
