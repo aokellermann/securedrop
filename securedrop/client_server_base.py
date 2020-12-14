@@ -27,20 +27,20 @@ class ClientBase:
         self.port = port
 
     def run(self, timeout=None):
-        print("Client starting main loop")
+        log.info("Client starting main loop")
         try:
             IOLoop.current().run_sync(self.main, timeout)
         finally:
-            print("Client exiting main loop")
+            log.info("Client exiting main loop")
 
     async def main(self):
-        print("Client starting connection")
+        log.info("Client starting connection")
         ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         ssl_ctx.load_verify_locations('server.pem')
         ssl_ctx.load_cert_chain('server.pem')
         ssl_ctx.check_hostname = False
         self.stream = await TCPClient().connect('127.0.0.1', self.port, ssl_options=ssl_ctx)
-        print("Client connected")
+        log.info("Client connected")
 
     async def read(self):
         data = await read(self.stream)
@@ -60,24 +60,24 @@ class ServerBase(TCPServer):
         self.shm = None
 
     def run(self, port, shm_name):
-        print("Server starting")
+        log.info("Server starting")
         self.shm = shared_memory.SharedMemory(shm_name)
         self.listen(port)
-        print("Server starting main loop")
+        log.info("Server starting main loop")
         try:
             PeriodicCallback(self.check_stop, 100).start()
             IOLoop.current().start()
         finally:
             self.shm.close()
             self.shm = None
-            print("Server exiting main loop")
+            log.info("Server exiting main loop")
 
     def check_stop(self):
         if self.shm.buf[0] == 1:
             IOLoop.current().add_callback(IOLoop.current().stop)
 
     async def handle_stream(self, stream, address):
-        print("Server accepted connection at host ", address)
+        log.info("Server accepted connection at host ", address)
         await stream.wait_for_handshake()
         while True:
             try:
@@ -85,11 +85,11 @@ class ServerBase(TCPServer):
                 log.debug("Server read bytes: ", data[:80])
                 await self.on_data_received(data, stream)
             except StreamClosedError:
-                print("Server lost client at host ", address)
+                log.info("Server lost client at host ", address)
                 await self.on_stream_closed(stream)
                 break
             except Exception as e:
-                print("Server caught exception: ", e)
+                log.error("Server caught exception: ", e)
 
     async def on_data_received(self, data, stream):
         pass

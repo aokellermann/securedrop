@@ -10,6 +10,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHAKE256, SHA256, SHA512
 from Crypto.Protocol.KDF import PBKDF2
 import Crypto.Util.Padding
+import logging as log
 
 from securedrop import ServerBase
 from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
@@ -149,19 +150,19 @@ class RegisteredUsers:
             return "User already exists."
         self.users[email_hash] = ClientData(name=name, email=valid_email, password=password, contacts=dict())
         self.write_json()
-        print("User Registered.")
+        log.info("User Registered.")
         return ""
 
     def login(self, email, password):
         email_hash = SHA256.new(email.encode()).hexdigest()
         if email_hash not in self.users:
-            print("Email and Password Combination Invalid.")
+            log.info("Email and Password Combination Invalid.")
             return "Email and Password Combination Invalid."
 
         user = self.users[email_hash]
         auth = Authentication(str(password), user.auth.salt)
         if auth != self.users[email_hash].auth:
-            print("Email and Password Combination Invalid.")
+            log.info("Email and Password Combination Invalid.")
             return "Email and Password Combination Invalid."
 
         user.email = email
@@ -192,7 +193,7 @@ class Server(ServerBase):
 
     async def on_data_received(self, data, stream):
         if len(data) < 4:
-            print("Server sent invalid data")
+            log.error("Server sent invalid data")
             return
 
         prefix = data[:4]
@@ -210,7 +211,7 @@ class Server(ServerBase):
         email = self.sock_to_email[stream]
         del self.sock_to_email[stream]
         del self.email_to_sock[email]
-        print("removed ", email, " from online connections")
+        log.info("removed ", email, " from online connections")
 
     async def write_status(self, stream, msg):
         await self.write(stream, bytes(StatusPackets(msg)))
@@ -220,7 +221,7 @@ class Server(ServerBase):
         if msg == "":
             self.email_to_sock[reg.email] = stream
             self.sock_to_email[stream] = reg.email
-            print("added ", reg.email, " to online connections")
+            log.info("added ", reg.email, " to online connections")
         await self.write_status(stream, msg)
 
     async def process_login(self, log, stream):
@@ -228,7 +229,7 @@ class Server(ServerBase):
         if msg == "":
             self.email_to_sock[log.email] = stream
             self.sock_to_email[stream] = log.email
-            print("added ", log.email, " to online connections")
+            log.info("added ", log.email, " to online connections")
         await self.write_status(stream, msg)
 
     async def add_contact(self, addc, stream):
@@ -258,7 +259,7 @@ class ServerDriver:
             server = Server(self.filename)
             server.run(self.port, self.sentinel_name())
         except Exception:
-            print("Caught exception. Exiting...")
+            log.error("Caught exception. Exiting...")
         finally:
             self.sentinel.buf[0] = 1
 
