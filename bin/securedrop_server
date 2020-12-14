@@ -17,7 +17,7 @@ if __name__ == "__main__":
             raise RuntimeError("Failed to create securedrop directory: $HOME/.securedrop")
     securedrop_file = os.path.join(securedrop_dir, "server_db.json")
     securedrop_port = None
-    verboseFlag = False
+    verbose_flag = False
     try:
         opts, args = getopt.getopt(sys.argv[1:], "p:f:v", ["port=", "filename=", "verbose"])
     except getopt.GetoptError as err:
@@ -29,9 +29,9 @@ if __name__ == "__main__":
         elif o in ("-f", "--filename"):
             securedrop_file = a
         elif o in ("-v", "--verbose"):
-            verboseFlag = True
+            verbose_flag = True
         else:
             raise RuntimeError("Unhandled argument found.")
 
-    utils.create_logger(verboseFlag)
+    utils.create_logger(verbose_flag)
     server.main(filename=securedrop_file, port=securedrop_port)
