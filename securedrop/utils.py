@@ -11,7 +11,7 @@ def validate_and_normalize_email(email):
         print(str(e))
 
 
-def create_logger(verbose):
+def set_logger(verbose):
     # create logger
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)

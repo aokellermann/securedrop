@@ -35,5 +35,5 @@ if __name__ == "__main__":
         else:
             raise RuntimeError("Unhandled argument found.")
 
-    utils.create_logger(verbose_flag)
+    utils.set_logger(verbose_flag)
     client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_hostname)
