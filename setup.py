@@ -26,5 +26,5 @@ setup(
         'tornado>=6.1',
         'urllib3>=1.26.2',
     ],
-
+    scripts=["bin/securedrop", "bin/securedrop_server"]
 )
