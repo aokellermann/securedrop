@@ -1,6 +1,6 @@
 import ssl
 
-from securedrop.utils import VerbosePrinter
+import logging as log
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
@@ -24,8 +24,6 @@ class ClientBase:
         super().__init__()
         self.stream = None
         self.host = host
-        self.port = port
-        self.vprint = VerbosePrinter()
 
     def run(self, timeout=None):
         print("Client starting main loop")
@@ -45,12 +43,12 @@ class ClientBase:
 
     async def read(self):
         data = await read(self.stream)
-        self.vprint.print("Client read bytes: ", data[:80])
+        log.debug("Client read bytes: ", data[:80])
         return data
 
     async def write(self, data: bytes):
         await write(self.stream, data)
-        self.vprint.print("Client wrote bytes: ", data[:80])
+        log.debug("Client wrote bytes: ", data[:80])
 
 
 class ServerBase(TCPServer):
@@ -59,7 +57,6 @@ class ServerBase(TCPServer):
         ssl_ctx.load_cert_chain("server.pem")
         super().__init__(ssl_options=ssl_ctx)
         self.shm = None
-        self.vprint = VerbosePrinter()
 
     def run(self, port, shm_name):
         print("Server starting")
@@ -84,7 +81,7 @@ class ServerBase(TCPServer):
         while True:
             try:
                 data = await read(stream)
-                self.vprint.print("Server read bytes: ", data[:80])
+                log.debug("Server read bytes: ", data[:80])
                 await self.on_data_received(data, stream)
             except StreamClosedError:
                 print("Server lost client at host ", address)
@@ -101,4 +98,4 @@ class ServerBase(TCPServer):
 
     async def write(self, stream, data: bytes):
         await write(stream, data)
-        self.vprint.print("Server wrote bytes: ", data[:80])
+        log.debug("Server wrote bytes: ", data[:80])

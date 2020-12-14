@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import getopt
+import logging as log
 import os
-from securedrop.utils import VerbosePrinter
 from securedrop import server
 import sys
 
@@ -23,12 +23,12 @@ if __name__ == "__main__":
         print(err)  # will print something like "option -a not recognized"
         sys.exit(2)
     for o, a in opts:
-        if o in ("-v", "--verbose"):
-            VerbosePrinter(True)
-        elif o in ("-p", "--port"):
+        if o in ("-p", "--port"):
             securedrop_port = a
         elif o in ("-f", "--filename"):
             securedrop_file = a
+        elif o in ("-v", "--verbose"):
+            log.basicConfig(format="%(message)s", level=log.DEBUG)
         else:
             assert False, "unhandled option"
     server.main(filename=securedrop_file, port=securedrop_port)
