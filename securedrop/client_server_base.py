@@ -29,20 +29,20 @@ class ClientBase:
         self.port = port
 
     def run(self, timeout=None):
-        log.info("Client starting main loop")
+        log.debug("Client starting main loop")
         try:
             IOLoop.current().run_sync(self.main, timeout)
         finally:
-            log.info("Client exiting main loop")
+            log.debug("Client exiting main loop")
 
     async def main(self):
-        log.info("Client starting connection")
+        log.debug("Client starting connection")
         ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         ssl_ctx.load_verify_locations('server.pem')
         ssl_ctx.load_cert_chain('server.pem')
         ssl_ctx.check_hostname = False
         self.stream = await TCPClient().connect('127.0.0.1', self.port, ssl_options=ssl_ctx)
-        log.info("Client connected")
+        log.debug("Client connected")
 
     async def read(self):
         data = await read(self.stream)
@@ -62,17 +62,17 @@ class ServerBase(TCPServer):
         self.shm = None
 
     def run(self, port, shm_name):
-        log.info("Server starting")
+        log.debug("Server starting")
         self.shm = shared_memory.SharedMemory(shm_name)
         self.listen(port)
-        log.info("Server starting main loop")
+        log.debug("Server starting main loop")
         try:
             PeriodicCallback(self.check_stop, 100).start()
             IOLoop.current().start()
         finally:
             self.shm.close()
             self.shm = None
-            log.info("Server exiting main loop")
+            log.debug("Server exiting main loop")
 
     def check_stop(self):
         if self.shm.buf[0] == 1:
