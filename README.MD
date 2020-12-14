@@ -31,7 +31,7 @@ PYTHONPATH=$PYTHONPATH:. ./bin/securedrop
 ### Running with executable arguments
 #### Running the server
 ```bash
-PYTHONPATH=$PYTHONPATH:. ./bin/securedrop_server --port 6789 --file example_file.json --verbose True 
+./bin/securedrop_server --port 6789 --file example_file.json --verbose 
 ```
 #### Running the client
 ```bash
