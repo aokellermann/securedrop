@@ -2,8 +2,7 @@
 import getopt
 import os
 import sys
-
-from securedrop import client
+from securedrop import client, utils
 
 if __name__ == "__main__":
     home_dir = os.getenv("HOME")
@@ -36,4 +35,6 @@ if __name__ == "__main__":
             verbose_flag = True
         else:
             raise RuntimeError("Unhandled argument found.")
+
+    utils.set_logger(verbose_flag)
     client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_hostname)

@@ -1,6 +1,7 @@
 import ssl
 import traceback
 
+from logging import getLogger
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
@@ -9,6 +10,8 @@ from tornado.netutil import bind_sockets
 from multiprocessing import shared_memory
 
 MESSAGE_SENTINEL = b"\n" * 2
+
+log = getLogger()
 
 
 async def read(stream):
@@ -31,30 +34,30 @@ class ClientBase:
         self.server_cert_path = server_cert_path
 
     def run(self, timeout=None):
-        print("Client starting main loop")
+        log.debug("Client starting main loop")
         try:
             IOLoop.current().run_sync(self.main, timeout)
         finally:
-            print("Client exiting main loop")
+            log.debug("Client exiting main loop")
 
     async def main(self):
-        print("Client starting connection to ", (self.host, self.port))
+        log.debug("Client starting connection to {}".format((self.host, self.port)))
         ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         if self.server_cert_path:
             ssl_ctx.load_verify_locations(self.server_cert_path)
             ssl_ctx.load_cert_chain(self.server_cert_path)
         ssl_ctx.check_hostname = False
         self.stream = await TCPClient().connect(self.host, self.port, ssl_options=ssl_ctx)
-        print("Client connected to ", (self.host, self.port))
+        log.debug("Client connected to {}".format((self.host, self.port)))
 
     async def read(self):
         data = await read(self.stream)
-        print("Client read bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
+        log.debug("Client read bytes: {}".format(data[:80].rstrip(MESSAGE_SENTINEL)))
         return data
 
     async def write(self, data: bytes):
         await write(self.stream, data)
-        print("Client wrote bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
+        log.debug("Client wrote bytes: {}".format(data[:80].rstrip(MESSAGE_SENTINEL)))
 
 
 class ServerBase(TCPServer):
@@ -74,43 +77,40 @@ class ServerBase(TCPServer):
         print("Server listening on port(s) ", self.listen_ports)
 
     def run(self, port, shm_name):
-        print("Server starting")
+        log.debug("Server starting")
         self.shm = shared_memory.SharedMemory(shm_name)
 
         # only listen() once!
         if not self.listen_ports:
             self.listen(port)
 
-        print("Server starting main loop")
+        log.debug("Server starting main loop")
         try:
             PeriodicCallback(self.check_stop, 100).start()
             IOLoop.current().start()
         finally:
             self.shm.close()
             self.shm = None
-            print("Server exiting main loop")
+            log.debug("Server exiting main loop")
 
     def check_stop(self):
         if self.shm.buf[0] == 1:
             IOLoop.current().add_callback(IOLoop.current().stop)
 
     async def handle_stream(self, stream, address):
-        print("Server accepted connection at host ", address)
-        await self.on_stream_accepted(stream, address)
-
+        log.info("Server accepted connection at host {}".format(address))
         await stream.wait_for_handshake()
         while True:
             try:
                 data = await read(stream)
-                print("Server read bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
+                log.debug("Server read bytes: {}".format(data[:80].rstrip(MESSAGE_SENTINEL)))
                 await self.on_data_received(data, stream)
             except StreamClosedError:
-                print("Server lost client at host ", address)
+                log.info("Server lost client at host {}".format(address))
                 await self.on_stream_closed(stream, address)
                 break
-            except:
-                print("Server caught exception: ")
-                traceback.print_exc()
+            except Exception as e:
+                log.error("Server caught exception: {}".format(e))
 
     async def on_data_received(self, data, stream):
         pass
@@ -123,4 +123,4 @@ class ServerBase(TCPServer):
 
     async def write(self, stream, data: bytes):
         await write(stream, data)
-        print("Server wrote bytes: ", data[:80].rstrip(MESSAGE_SENTINEL))
+        log.debug("Server wrote bytes: {}".format(data[:80].rstrip(MESSAGE_SENTINEL)))
