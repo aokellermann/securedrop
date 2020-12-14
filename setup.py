@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from setuptools import find_packages
 from setuptools import setup
 
@@ -18,7 +20,7 @@ setup(
         'email-validator>=1.1.2',
         'idna>=2.10',
         'Naked>=0.1.31',
-        'nest>asyncio==1.4.3',
+        'nest-asyncio==1.4.3',
         'pycryptodome>=3.9.9',
         'PyYAML>=5.3.1',
         'requests>=2.25.0',
