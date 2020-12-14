@@ -262,30 +262,43 @@ class Client(ClientBase):
             # wait for listen
             port = 0
             while port == 0:
-                # lock.acquire(timeout=0.1)
-                port = int.from_bytes(listen_port.buf, byteorder='little')
+                with lock:
+                    port = int.from_bytes(listen_port.buf, byteorder='little')
 
             await self.write(bytes(FileTransferSendPortPackets(port)))
 
             # Wait until file received
 
             time_start = time.time()
+            status_sentinel = False
 
+            def get_progress():
+                chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
+                prog, total = int.from_bytes(progress.buf[0:4], byteorder='little') * chunk_size, \
+                              int.from_bytes(progress.buf[4:8], byteorder='little') * chunk_size
+                percent = 100 * (prog / total) if total else 0
+                return sizeof_fmt(prog), sizeof_fmt(total), "{}%".format(int(percent))
+
+            def print_status():
+                while not status_sentinel:
+                    with lock:
+                        prog, total, percent = get_progress()
+                        print("{}/{} received ({})".format(prog, total, percent), end='\r', flush=True)
+                    time.sleep(0.1)
+
+            status_thread = Thread(target=print_status)
+            status_thread.start()
             try:
-                while p2p_server_process.is_alive():
-                    # with lock:
-                    #     print("{}/{} chunks sent".format(int.from_bytes(progress.buf[0:4], byteorder='little'),
-                    #                                      int.from_bytes(progress.buf[4:8], byteorder='little')))
-                    p2p_server_process.join(0.1)
-
+                p2p_server_process.join()
             except KeyboardInterrupt:
-                p2p_server_process.terminate()
                 raise RuntimeError("User requested abort")
             finally:
-                sentinel.buf[0] = 1
-                p2p_server_process.join(0.5)
                 if p2p_server_process.is_alive():
                     p2p_server_process.terminate()
+                status_sentinel = True
+                status_thread.join()
+                final_prog, final_total, final_percent = get_progress()
+                print("{}/{} received ({})".format(final_prog, final_total, final_percent))
                 progress.close()
                 progress.unlink()
                 sentinel.close()
@@ -346,9 +359,8 @@ class Client(ClientBase):
             time_start = time.time()
             sentinel = False
 
-            chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
-
             def get_progress():
+                chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
                 prog, total = int.from_bytes(progress.buf[0:4], byteorder='little') * chunk_size, \
                               int.from_bytes(progress.buf[4:8], byteorder='little') * chunk_size
                 percent = 100 * (prog / total) if total else 0
@@ -371,7 +383,7 @@ class Client(ClientBase):
                 sentinel = True
                 status_thread.join()
                 final_prog, final_total, final_percent = get_progress()
-                print("{}/{} sent ({})".format(final_prog, final_total, final_percent), end='\r', flush=True)
+                print("{}/{} sent ({})".format(final_prog, final_total, final_percent))
                 progress.close()
                 progress.unlink()
                 time_end = time.time()

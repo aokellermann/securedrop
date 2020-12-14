@@ -62,10 +62,9 @@ class P2PServer(ServerBase):
         self.sentinel = shared_memory.SharedMemory(shm_name)
         self.sentinel.buf[0] = 0
         try:
-            # with self.lock:
             self.listen(port)
-            print("P2P listening on ", self.listen_ports)
-            self.listen_port_shm.buf[0:4] = int(next(iter(self.listen_ports))).to_bytes(4, byteorder='little')
+            with self.lock:
+                self.listen_port_shm.buf[0:4] = int(next(iter(self.listen_ports))).to_bytes(4, byteorder='little')
 
             super().run(port, shm_name)
         finally:
