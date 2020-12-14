@@ -23,6 +23,7 @@ if __name__ == "__main__":
     except getopt.GetoptError as err:
         print(err)  # will print something like "option -a not recognized"
         sys.exit(2)
+    verboseFlag = False
     for o, a in opts:
         if o in ("-p", "--port"):
             securedrop_port = a
@@ -31,8 +32,11 @@ if __name__ == "__main__":
         elif o in ("-a", "--address"):
             securedrop_hostname = a
         elif o in ("-v", "--verbose"):
-            log.basicConfig(format="%(message)s", level=log.DEBUG)
-            verbose_flag = True
+            verboseFlag = True
         else:
             raise RuntimeError("Unhandled argument found.")
+    if verboseFlag:
+        log.basicConfig(format="%(message)s", level=log.DEBUG)
+    else:
+        log.basicConfig(format="%(message)s", level=log.INFO)
     client.main(filename=securedrop_file, port=securedrop_port, hostname=securedrop_hostname)
