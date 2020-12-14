@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import getpass
 import json
 import os
@@ -7,6 +6,7 @@ import select
 import sys
 import time
 from multiprocessing import Process, shared_memory, Lock
+from threading import Thread
 
 import nest_asyncio
 
@@ -14,7 +14,7 @@ from securedrop.add_contact_packets import AddContactPackets
 from securedrop.client_server_base import ClientBase
 from securedrop.file_transfer_packets import FileTransferRequestPackets, FileTransferRequestResponsePackets, \
     FileTransferCheckRequestsPackets, FileTransferAcceptRequestPackets, FileTransferSendTokenPackets, \
-    FileTransferSendPortPackets, FileTransferSendPortTokenPackets
+    FileTransferSendPortPackets, FileTransferSendPortTokenPackets, FILE_TRANSFER_P2P_CHUNK_SIZE
 from securedrop.login_packets import LoginPackets
 from securedrop.p2p import P2PClient, P2PServer
 from securedrop.register_packets import RegisterPackets
@@ -169,7 +169,8 @@ class Client(ClientBase):
                         break
                     prompt = True
 
-                await self.check_for_file_transfer_requests()
+                if (await self.check_for_file_transfer_requests()) is not None:
+                    prompt = True
 
         except Exception as e:
             print("Exiting SecureDrop")
@@ -238,7 +239,7 @@ class Client(ClientBase):
             # 4. `Y -> Yes/No -> S`: Y accepts or denies transfer request
             await self.write(bytes(packets))
             if not accept:
-                return
+                return False
 
             # 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
             token = FileTransferSendTokenPackets(data=(await self.read())[4:]).token
@@ -295,6 +296,7 @@ class Client(ClientBase):
                 time_end = time.time()
 
             print("File transfer completed successfully in {} seconds.".format(time_end - time_start))
+            return True
 
     # X
     async def send_file(self):
@@ -311,12 +313,14 @@ class Client(ClientBase):
                 raise RuntimeError("Empty file path.")
             if not os.path.exists(file_path):
                 raise RuntimeError("Cannot find file: {}".format(file_path))
+            if not os.path.isfile(file_path):
+                raise RuntimeError("Not a file: {}".format(file_path))
 
-            file_name = os.path.basename(file_path)
+            file_base = os.path.basename(file_path)
             file_size = os.path.getsize(file_path)
             file_sha256 = sha256_file(file_path)
             file_info = {
-                "name": file_name,
+                "name": file_base,
                 "size": file_size,
                 "SHA256": file_sha256,
             }
@@ -330,39 +334,49 @@ class Client(ClientBase):
             # 7. `S -> Token/Port -> X`: S sends the same token and port to X
             port_and_token = FileTransferSendPortTokenPackets(data=(await self.read())[4:])
             port, token = port_and_token.port, port_and_token.token
-            if not token:
-                raise RuntimeError("User {} declined the file transfer".format(valid_email))
-
-            print("Connecting to recipient on port ", port)
+            if token:
+                print("User {} accepted the file transfer Connecting to recipient on port ".format(valid_email, port))
+            else:
+                raise RuntimeError("User {} declined the file transfer request".format(valid_email))
 
             progress = shared_memory.SharedMemory(create=True, size=8)
             progress_lock = Lock()
             p2p_client = P2PClient(port, token, file_path, file_size, file_sha256, progress.name, progress_lock)
-            await p2p_client.main()
-            # p2p_client_process = Process(target=p2p_client.run)
-            # p2p_client_process.start()
-            #
-            # time_start = time.time()
-            #
-            # try:
-            #     while p2p_client_process.is_alive():
-            #         # with progress_lock:
-            #         #     print("{}/{} chunks sent".format(int.from_bytes(progress.buf[0:4], byteorder='little'),
-            #         #                                      int.from_bytes(progress.buf[4:8], byteorder='little')))
-            #         p2p_client_process.join(1)
-            #
-            # except KeyboardInterrupt:
-            #     p2p_client_process.terminate()
-            #     raise RuntimeError("User requested abort")
-            # finally:
-            #     if p2p_client_process.is_alive():
-            #         p2p_client_process.terminate()
-            #     progress.close()
-            #     progress.unlink()
-            #
-            #     time_end = time.time()
-            #
-            # print("File transfer completed in {} seconds.".format(time_end - time_start))
+
+            time_start = time.time()
+            sentinel = False
+
+            chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
+
+            def get_progress():
+                prog, total = int.from_bytes(progress.buf[0:4], byteorder='little') * chunk_size, \
+                              int.from_bytes(progress.buf[4:8], byteorder='little') * chunk_size
+                percent = 100 * (prog / total) if total else 0
+                return sizeof_fmt(prog), sizeof_fmt(total), "{}%".format(int(percent))
+
+            def print_status():
+                while not sentinel:
+                    with progress_lock:
+                        prog, total, percent = get_progress()
+                        print("{}/{} sent ({})".format(prog, total, percent), end='\r', flush=True)
+                    time.sleep(0.1)
+
+            status_thread = Thread(target=print_status)
+            status_thread.start()
+            try:
+                await p2p_client.main()
+            except KeyboardInterrupt:
+                raise RuntimeError("User requested abort")
+            finally:
+                sentinel = True
+                status_thread.join()
+                final_prog, final_total, final_percent = get_progress()
+                print("{}/{} sent ({})".format(final_prog, final_total, final_percent), end='\r', flush=True)
+                progress.close()
+                progress.unlink()
+                time_end = time.time()
+
+            print("\nFile transfer completed in {} seconds.".format(time_end - time_start))
 
         except RuntimeError as e:
             msg = str(e)
