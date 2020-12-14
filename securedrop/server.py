@@ -224,12 +224,12 @@ class Server(ServerBase):
             log.info("added ", reg.email, " to online connections")
         await self.write_status(stream, msg)
 
-    async def process_login(self, log, stream):
-        msg = self.users.login(log.email, log.password)
+    async def process_login(self, login, stream):
+        msg = self.users.login(login.email, login.password)
         if msg == "":
-            self.email_to_sock[log.email] = stream
-            self.sock_to_email[stream] = log.email
-            log.info("added ", log.email, " to online connections")
+            self.email_to_sock[login.email] = stream
+            self.sock_to_email[stream] = login.email
+            log.info("added ", login.email, " to online connections")
         await self.write_status(stream, msg)
 
     async def add_contact(self, addc, stream):
