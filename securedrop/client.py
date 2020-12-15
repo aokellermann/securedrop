@@ -275,6 +275,8 @@ class Client(ClientBase):
                     print("The path {} is not a directory".format(os.path.abspath(out_directory)))
                 elif os.path.exists(file_path):
                     print("The file {} already exists".format(file_path))
+                elif not os.access(out_directory, os.X_OK | os.W_OK):
+                    print("Cannot write file path {} permission denied.".format(file_path))
                 else:
                     break
 
