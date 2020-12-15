@@ -119,8 +119,6 @@ class Client(ClientBase):
                     raise RuntimeError("Login failed.")
         except KeyboardInterrupt:
             pass
-        except RuntimeError as e:
-            print(e)
         finally:
             print("Exiting SecureDrop")
 
