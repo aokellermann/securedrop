@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 
-import os
 import base64
 import json
+import os
+from logging import getLogger
 from multiprocessing import shared_memory
 
-from Crypto.Random import get_random_bytes
+import Crypto.Util.Padding
 from Crypto.Cipher import AES
 from Crypto.Hash import SHAKE256, SHA256, SHA512
 from Crypto.Protocol.KDF import PBKDF2
-import Crypto.Util.Padding
-from logging import getLogger
+from Crypto.Random import get_random_bytes
 
 from securedrop import ServerBase
-from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
-from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
-from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
+from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME
+from securedrop.List_Contacts_Response_Packets import ListContactsResponsePackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
-
-from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
-from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
+from securedrop.file_transfer_packets import FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME, FileTransferRequestPackets, \
+    FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME, FileTransferCheckRequestsPackets, \
+    FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME, FileTransferAcceptRequestPackets, \
+    FileTransferSendTokenPackets, FILE_TRANSFER_SEND_PORT_PACKETS_NAME, FileTransferSendPortPackets, \
+    FileTransferSendPortTokenPackets
+from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
+from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
+from securedrop.status_packets import StatusPackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
@@ -188,6 +192,16 @@ class RegisteredUsers:
         self.write_json()
         return ""
 
+    def contacts_contains(self, user1_email, user2_email):
+        valid_contact_email1 = validate_and_normalize_email(user1_email)
+        valid_contact_email2 = validate_and_normalize_email(user2_email)
+        if not valid_contact_email1 or not valid_contact_email2:
+            return "Invalid Email Address."
+
+        email1_hash = SHA256.new(valid_contact_email1.encode()).hexdigest()
+        user = self.users[email1_hash]
+        return user.contacts and valid_contact_email2 in user.contacts
+
     def get_contacts(self, email):
         if not email:
             return "Invalid email address"
@@ -200,9 +214,13 @@ class Server(ServerBase):
         self.users = RegisteredUsers(filename)
         self.email_to_sock = dict()
         self.sock_to_email = dict()
+        self.sock_to_address = dict()
+        self.file_transfer_requests = dict()
+        self.file_transfer_recipients = dict()
         super().__init__()
 
     async def on_data_received(self, data, stream):
+        await super().on_data_received(data, stream)
         if len(data) < 4:
             log.error("Server sent invalid data")
             return
@@ -217,13 +235,27 @@ class Server(ServerBase):
             await self.add_contact(AddContactPackets(data=data), stream)
         elif prefix == LIST_CONTACTS_PACKETS_NAME:
             await self.list_contacts(stream)
+        elif prefix == FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME:
+            await self.process_file_transfer_request(FileTransferRequestPackets(data=data), stream)
+        elif prefix == FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME:
+            await self.send_active_file_transfer_requests(stream)
+        elif prefix == FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME:
+            await self.process_file_transfer_request_accept(FileTransferAcceptRequestPackets(data=data), stream)
+        elif prefix == FILE_TRANSFER_SEND_PORT_PACKETS_NAME:
+            await self.process_file_transfer_received_port(FileTransferSendPortPackets(data=data), stream)
 
-    async def on_stream_closed(self, stream):
+    async def on_stream_accepted(self, stream, address):
+        await super().on_stream_accepted(stream, address)
+        self.sock_to_address[stream] = address
+
+    async def on_stream_closed(self, stream, address):
+        await super().on_stream_closed(stream, address)
         if stream not in self.sock_to_email:
             return
         email = self.sock_to_email[stream]
         del self.sock_to_email[stream]
         del self.email_to_sock[email]
+        del self.sock_to_address[stream]
         log.info("removed {} from online connections".format(email))
 
     async def write_status(self, stream, msg):
@@ -267,6 +299,52 @@ class Server(ServerBase):
 
         await self.write_list_contacts_response(stream, contacts_dict_send)
 
+    # 1. `X -> Y/F -> S`: X wants to send F to Y
+    async def process_file_transfer_request(self, ftrp, stream):
+        sender_email = self.sock_to_email[stream]
+        recipient_email = ftrp.recipient_email
+        msg = ""
+        if recipient_email not in self.email_to_sock:
+            msg = "User [{}] is not online".format(recipient_email)
+        elif not self.users.contacts_contains(recipient_email, sender_email):
+            msg = "User [{}] has not added you as a contact".format(recipient_email)
+        elif self.sock_to_address[stream][0] != self.sock_to_address[self.email_to_sock[recipient_email]][0]:
+            msg = "User [{}] is not on the same network [{}] as you".format(recipient_email,
+                                                                            self.sock_to_address[stream][0])
+        else:
+            if recipient_email not in self.file_transfer_requests:
+                self.file_transfer_requests[recipient_email] = dict()
+            self.file_transfer_requests[recipient_email][self.sock_to_email[stream]] = ftrp.file_info
+        await self.write_status(stream, msg)
+
+    # 2. `Y -> S`: every one second, Y asks server for any requests
+    # 3. `S -> X/F -> Y`: server responds with active requests
+    async def send_active_file_transfer_requests(self, stream):
+        email = self.sock_to_email[stream]
+        requests = self.file_transfer_requests[email] if email in self.file_transfer_requests else dict()
+        await self.write(stream, bytes(FileTransferCheckRequestsPackets(requests)))
+
+    # 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
+    # 7. `S -> Token/Port -> X`: S sends the same token and port to X
+    async def process_file_transfer_request_accept(self, ftar, stream):
+        deny = not ftar.sender_email
+        token = get_random_bytes(32) if not deny else b""
+        if deny:
+            for sender_email in self.file_transfer_requests[self.sock_to_email[stream]].keys():
+                await self.write(self.email_to_sock[sender_email], bytes(FileTransferSendPortTokenPackets(0, token)))
+            del self.file_transfer_requests[self.sock_to_email[stream]]
+        else:
+            del self.file_transfer_requests[self.sock_to_email[stream]][ftar.sender_email]
+            sender_sock = self.email_to_sock[ftar.sender_email]
+            self.file_transfer_recipients[stream] = {"token": token, "sender": sender_sock}
+            await self.write(stream, bytes(FileTransferSendTokenPackets(token)))
+
+    # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
+    # 7. `S -> Token/Port -> X`: S sends the same token and port to X
+    async def process_file_transfer_received_port(self, ftsp, stream):
+        recipient = self.file_transfer_recipients[stream]
+        await self.write(recipient["sender"], bytes(FileTransferSendPortTokenPackets(ftsp.port, recipient["token"])))
+
 
 class ServerDriver:
     def __init__(self, port=None, filename=None):
@@ -289,8 +367,10 @@ class ServerDriver:
         try:
             server = Server(self.filename)
             server.run(self.port, self.sentinel_name())
-        except Exception:
-            log.error("Caught exception. Exiting...")
+        except KeyboardInterrupt:
+            log.info("Caught KeyboardInterrupt. Exiting.")
+        except:
+            log.error("Caught exception. Exiting.")
         finally:
             self.sentinel.buf[0] = 1
 
