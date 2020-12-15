@@ -15,7 +15,8 @@ from securedrop.utils import sha256_file
 class P2PClient(ClientBase):
     def __init__(self, port, token, in_filename, in_file_size, in_file_sha256, progress_shm_name, progress_lock):
         super().__init__("localhost", port)
-        self.token, self.in_filename, self.in_file_size, self.in_file_sha256, self.progress_shm_name, self.progress_lock = token, in_filename, in_file_size, in_file_sha256, progress_shm_name, progress_lock
+        self.token, self.in_filename, self.in_file_size, self.in_file_sha256, self.progress_shm_name,\
+            self.progress_lock = token, in_filename, in_file_size, in_file_sha256, progress_shm_name, progress_lock
 
     async def main(self):
         await super().main()
