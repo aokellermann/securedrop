@@ -14,7 +14,7 @@ python ./scripts/setup.py build
 
 ### Install dependencies 
 ```bash
-python ./scripts/setup.py install
+python ./setup.py install
 ```
 ## Usage
 
