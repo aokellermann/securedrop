@@ -10,6 +10,9 @@ from threading import Thread
 
 import nest_asyncio
 
+from securedrop import utils
+from securedrop.List_Contacts_Packets import ListContactsPackets
+from securedrop.List_Contacts_Response_Packets import ListContactsResponsePackets
 from securedrop.add_contact_packets import AddContactPackets
 from securedrop.client_server_base import ClientBase
 from securedrop.file_transfer_packets import FileTransferRequestPackets, FileTransferRequestResponsePackets, \
@@ -19,13 +22,7 @@ from securedrop.login_packets import LoginPackets
 from securedrop.p2p import P2PClient, P2PServer
 from securedrop.register_packets import RegisterPackets
 from securedrop.status_packets import StatusPackets
-from securedrop.utils import validate_and_normalize_email, sha256_file, sizeof_fmt
-from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
-from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
-from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
-from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
-from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
-from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
+from securedrop.utils import sha256_file, sizeof_fmt
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_FILENAME = 'client.json'
@@ -319,21 +316,18 @@ class Client(ClientBase):
         time_start = time.time()
         status_sentinel = False
 
-        def get_progress():
-            chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
-            prog, total = int.from_bytes(progress.buf[0:4], byteorder='little') * chunk_size, \
-                          int.from_bytes(progress.buf[4:8], byteorder='little') * chunk_size
-            percent = 100 * (prog / total) if total else 0
-            return sizeof_fmt(prog), sizeof_fmt(total), "{}%".format(int(percent))
+        chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
 
-        def print_status():
+        def print_received_progress():
             while not status_sentinel:
                 with lock:
-                    prog, total, percent = get_progress()
-                    print("{}/{} received ({})".format(prog, total, percent), end='\r', flush=True)
+                    utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                                                           int.from_bytes(progress.buf[4:8], byteorder='little'),
+                                                           chunk_size), "received")
                 time.sleep(0.1)
+            print()
 
-        status_thread = Thread(target=print_status)
+        status_thread = Thread(target=print_received_progress)
         status_thread.start()
         try:
             p2p_server_process.join()
@@ -344,8 +338,7 @@ class Client(ClientBase):
                 p2p_server_process.terminate()
             status_sentinel = True
             status_thread.join()
-            final_prog, final_total, final_percent = get_progress()
-            print("{}/{} received ({})".format(final_prog, final_total, final_percent))
+            print_received_progress()
             progress.close()
             progress.unlink()
             sentinel.close()
@@ -411,22 +404,19 @@ class Client(ClientBase):
             time_start = time.time()
             sentinel = False
 
-            def get_progress():
-                chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
-                prog, total = int.from_bytes(progress.buf[0:4], byteorder='little') * chunk_size, \
-                              int.from_bytes(progress.buf[4:8], byteorder='little') * chunk_size
-                percent = 100 * (prog / total) if total else 0
-                return sizeof_fmt(prog), sizeof_fmt(total), "{}%".format(int(percent))
+            chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
 
-            def print_status():
+            def print_sent_progress():
                 while not sentinel:
                     with progress_lock:
-                        prog, total, percent = get_progress()
-                        print("{}/{} sent ({})".format(prog, total, percent), end='\r', flush=True)
+                        utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                                                               int.from_bytes(progress.buf[4:8], byteorder='little'),
+                                                               chunk_size), "sent")
                     time.sleep(0.1)
+                print()
 
             # i was having trouble with asyncio.gather, so just run status printer in a new thread
-            status_thread = Thread(target=print_status)
+            status_thread = Thread(target=print_sent_progress)
             status_thread.start()
 
             # wait until p2p transfer completes, unless keyboard interrupt
@@ -437,8 +427,7 @@ class Client(ClientBase):
             finally:
                 sentinel = True
                 status_thread.join()
-                final_prog, final_total, final_percent = get_progress()
-                print("{}/{} sent ({})".format(final_prog, final_total, final_percent))
+                print_sent_progress()
                 progress.close()
                 progress.unlink()
                 time_end = time.time()

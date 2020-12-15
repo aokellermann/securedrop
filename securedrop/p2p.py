@@ -72,6 +72,12 @@ class P2PServer(ServerBase):
             self.listen_port_shm.close()
             self.sentinel.close()
 
+    async def on_stream_accepted(self, stream, address):
+        pass
+
+    async def on_stream_closed(self, stream, address):
+        pass
+
     async def on_data_received(self, data, stream):
         prefix = data[:4]
         data = data[4:]

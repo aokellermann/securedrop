@@ -220,6 +220,7 @@ class Server(ServerBase):
         super().__init__()
 
     async def on_data_received(self, data, stream):
+        await super().on_data_received(data, stream)
         if len(data) < 4:
             log.error("Server sent invalid data")
             return
@@ -244,9 +245,11 @@ class Server(ServerBase):
             await self.process_file_transfer_received_port(FileTransferSendPortPackets(data=data), stream)
 
     async def on_stream_accepted(self, stream, address):
+        await super().on_stream_accepted(stream, address)
         self.sock_to_address[stream] = address
 
     async def on_stream_closed(self, stream, address):
+        await super().on_stream_closed(stream, address)
         if stream not in self.sock_to_email:
             return
         email = self.sock_to_email[stream]
