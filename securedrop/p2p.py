@@ -1,11 +1,13 @@
 import os
+import zlib
 from base64 import b64encode, b64decode
 from math import ceil
 from multiprocessing import shared_memory
 
 from securedrop import ClientBase, ServerBase
 from securedrop.file_transfer_packets import FILE_TRANSFER_P2P_CHUNK_SIZE, FileTransferP2PChunkPackets, \
-    FileTransferP2PFileInfoPackets, FILE_TRANSFER_P2P_FILEINFO_PACKETS_NAME, FILE_TRANSFER_P2P_CHUNK_PACKETS_NAME
+    FileTransferP2PFileInfoPackets, FILE_TRANSFER_P2P_FILEINFO_PACKETS_NAME, FILE_TRANSFER_P2P_CHUNK_PACKETS_NAME, \
+    FILE_TRANSFER_P2P_SENTINEL_PACKETS_NAME, FileTransferP2PSentinelPackets
 from securedrop.status_packets import StatusPackets
 from securedrop.utils import sha256_file
 
@@ -36,17 +38,21 @@ class P2PClient(ClientBase):
                 progress.buf[4:8] = total_chunks.to_bytes(4, byteorder='little')
 
             with open(self.in_filename, "rb") as file:
-                while chunk := b64encode(file.read(FILE_TRANSFER_P2P_CHUNK_SIZE)):
-                    await self.write(bytes(FileTransferP2PChunkPackets(chunk)))
+                compressor = zlib.compressobj()
+                while chunk := file.read(FILE_TRANSFER_P2P_CHUNK_SIZE):
+                    await self.write(bytes(FileTransferP2PChunkPackets(b64encode(compressor.compress(chunk)))))
                     chunks_sent += 1
                     with self.progress_lock:
                         progress.buf[0:4] = chunks_sent.to_bytes(4, byteorder='little')
+
+                await self.write(bytes(FileTransferP2PChunkPackets(b64encode(compressor.flush()))))
+                await self.write(bytes(FileTransferP2PSentinelPackets()))
         finally:
             progress.close()
 
 
 class P2PServer(ServerBase):
-    def __init__(self, token, out_dir, progress_shm_name, lock, listen_port_shm_name):
+    def __init__(self, token, out_dir, progress_shm_name, lock, listen_port_shm_name, status_sentinel):
         super().__init__()
         self.token = token
         self.out_dir, self.lock = out_dir, lock
@@ -54,23 +60,31 @@ class P2PServer(ServerBase):
         self.progress = shared_memory.SharedMemory(progress_shm_name)
         self.listen_port_shm = shared_memory.SharedMemory(listen_port_shm_name)
         self.sentinel = None
+        self.status_sentinel = shared_memory.SharedMemory(status_sentinel)
         self.out_filename = ""
         self.verified = False
         self.out_path = ""
+        self.decompressor = None
 
-    def run(self, port, shm_name):
-        self.sentinel = shared_memory.SharedMemory(shm_name)
+    def run(self, port, server_sentinel):
+        self.sentinel = shared_memory.SharedMemory(server_sentinel)
         self.sentinel.buf[0] = 0
         try:
             self.listen(port)
             with self.lock:
                 self.listen_port_shm.buf[0:4] = int(next(iter(self.listen_ports))).to_bytes(4, byteorder='little')
 
-            super().run(port, shm_name)
+            super().run(port, server_sentinel)
         finally:
             self.progress.close()
             self.listen_port_shm.close()
             self.sentinel.close()
+            self.status_sentinel.close()
+
+    # suppress output with these empty functions
+
+    def on_listen(self):
+        pass
 
     async def on_stream_accepted(self, stream, address):
         pass
@@ -89,8 +103,8 @@ class P2PServer(ServerBase):
             stream.close()
         elif prefix == FILE_TRANSFER_P2P_CHUNK_PACKETS_NAME:
             await self.process_chunk(FileTransferP2PChunkPackets(data=data))
-            if self.received_chunks == self.total_chunks:
-                await self.complete_transfer(stream)
+        elif prefix == FILE_TRANSFER_P2P_SENTINEL_PACKETS_NAME:
+            await self.complete_transfer(stream)
 
     async def process_fileinfo(self, file_info, stream):
         if self.token != file_info.token:
@@ -101,6 +115,7 @@ class P2PServer(ServerBase):
         self.out_filename = file_info.file_info["name"]
         self.total_chunks = file_info.file_info["chunks"]
         self.sha256 = file_info.file_info["SHA256"]
+        self.decompressor = zlib.decompressobj()
 
         with self.lock:
             self.progress.buf[0:4] = self.received_chunks.to_bytes(4, byteorder='little')
@@ -110,12 +125,16 @@ class P2PServer(ServerBase):
         if not self.out_path:
             self.out_path = os.path.join(self.out_dir, self.out_filename)
         with open(self.out_path, "ab") as file:
-            file.write(b64decode(chunk.chunk))
+            file.write(self.decompressor.decompress(b64decode(chunk.chunk)))
             self.received_chunks += 1
             with self.lock:
                 self.progress.buf[0:4] = self.received_chunks.to_bytes(4, byteorder='little')
 
     async def complete_transfer(self, stream):
+        with self.lock:
+            self.status_sentinel.buf[0] = 1
+        with open(self.out_path, "ab") as file:
+            file.write(self.decompressor.flush())
         compare_sha256 = sha256_file(self.out_path)
         msg = "" if self.sha256 == compare_sha256 else "File hashes don't match!"
         await self.write(stream, bytes(StatusPackets(msg)))

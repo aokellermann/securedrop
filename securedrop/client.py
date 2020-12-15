@@ -290,14 +290,15 @@ class Client(ClientBase):
 
         lock = Lock()
         progress = shared_memory.SharedMemory(create=True, size=8)
-        sentinel = shared_memory.SharedMemory(create=True, size=1)
+        server_sentinel = shared_memory.SharedMemory(create=True, size=1)
+        status_sentinel = shared_memory.SharedMemory(create=True, size=1)
         listen_port = shared_memory.SharedMemory(create=True, size=4)
 
         # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
-        p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name)
+        p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name, status_sentinel.name)
         p2p_server_process = Process(target=p2p_server.run, args=(
             0,
-            sentinel.name,
+            server_sentinel.name
         ))
         p2p_server_process.start()
 
@@ -314,18 +315,21 @@ class Client(ClientBase):
         # Wait until file received
 
         time_start = time.time()
-        status_sentinel = False
 
         chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
 
+        def unguarded_print_received_progress(final=False):
+            utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                                                   int.from_bytes(progress.buf[4:8], byteorder='little'),
+                                                   chunk_size), "received", final)
+
         def print_received_progress():
-            while not status_sentinel:
+            while True:
                 with lock:
-                    utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
-                                                           int.from_bytes(progress.buf[4:8], byteorder='little'),
-                                                           chunk_size), "received")
+                    if status_sentinel.buf[0] == 1:
+                        break
+                    unguarded_print_received_progress()
                 time.sleep(0.03)
-            print()
 
         status_thread = Thread(target=print_received_progress)
         status_thread.start()
@@ -336,13 +340,16 @@ class Client(ClientBase):
         finally:
             if p2p_server_process.is_alive():
                 p2p_server_process.terminate()
-            status_sentinel = True
+            with lock:
+                status_sentinel.buf[0] = 1
             status_thread.join()
-            print_received_progress()
+            unguarded_print_received_progress(final=True)
             progress.close()
             progress.unlink()
-            sentinel.close()
-            sentinel.unlink()
+            server_sentinel.close()
+            server_sentinel.unlink()
+            status_sentinel.close()
+            status_sentinel.unlink()
             listen_port.close()
             listen_port.unlink()
 
@@ -406,14 +413,16 @@ class Client(ClientBase):
 
             chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
 
+            def unguarded_print_sent_progress(final=False):
+                utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                                                       int.from_bytes(progress.buf[4:8], byteorder='little'),
+                                                       chunk_size), "sent", final)
+
             def print_sent_progress():
                 while not sentinel:
                     with progress_lock:
-                        utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
-                                                               int.from_bytes(progress.buf[4:8], byteorder='little'),
-                                                               chunk_size), "sent")
+                        unguarded_print_sent_progress()
                     time.sleep(0.03)
-                print()
 
             # i was having trouble with asyncio.gather, so just run status printer in a new thread
             status_thread = Thread(target=print_sent_progress)
@@ -427,7 +436,7 @@ class Client(ClientBase):
             finally:
                 sentinel = True
                 status_thread.join()
-                print_sent_progress()
+                unguarded_print_sent_progress(final=True)
                 progress.close()
                 progress.unlink()
                 time_end = time.time()

@@ -1,5 +1,6 @@
 import math
 import os
+import zlib
 
 from Crypto.Hash import SHA256
 import logging
@@ -23,8 +24,8 @@ def sha256_file(path: str):
     total_chunks = os.path.getsize(path) / math.ceil(chunk_size)
     chunks_so_far = 0
 
-    def print_hash_progress():
-        print_status(*get_progress(chunks_so_far, total_chunks, chunk_size), "hashed")
+    def print_hash_progress(final=False):
+        print_status(*get_progress(chunks_so_far, total_chunks, chunk_size), "hashed", final)
 
     print_hash_progress()
     with open(path, "rb") as file:
@@ -35,7 +36,7 @@ def sha256_file(path: str):
             if chunks_so_far % 10 == 0:
                 print_hash_progress()
 
-        print_hash_progress()
+        print_hash_progress(final=True)
         return hasher.hexdigest()
 
 
@@ -73,5 +74,5 @@ def get_progress(chunks_so_far, total_chunks, chunk_size):
     return sizeof_fmt(chunks_so_far), sizeof_fmt(total_chunks), "{}%".format(int(percent))
 
 
-def print_status(progress, total, percent, verb):
-    print("{}/{} {} ({})".format(progress, total, verb, percent), end='\r', flush=True)
+def print_status(progress, total, percent, verb, final=False):
+    print("{}/{} {} ({})".format(progress, total, verb, percent), end='\n' if final else '\r', flush=True)

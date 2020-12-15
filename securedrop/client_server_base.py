@@ -77,7 +77,10 @@ class ServerBase(TCPServer):
         socks = bind_sockets(port)
         self.add_sockets(socks)
         self.listen_ports = {sock.getsockname()[1] for sock in socks}
-        print("Server listening on port(s) ", self.listen_ports)
+        self.on_listen()
+
+    def on_listen(self):
+        log.info("Server listening on port(s) {}".format(self.listen_ports))
 
     def run(self, port, shm_name):
         log.debug("Server starting")

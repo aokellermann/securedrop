@@ -218,6 +218,14 @@ class FileTransferP2PChunkPackets:
         return FILE_TRANSFER_P2P_CHUNK_PACKETS_NAME + bytes(json.dumps(self.jdict), encoding='ascii')
 
 
+FILE_TRANSFER_P2P_SENTINEL_PACKETS_NAME = b"FTPS"
+
+
+class FileTransferP2PSentinelPackets:
+    def __bytes__(self):
+        return FILE_TRANSFER_P2P_SENTINEL_PACKETS_NAME
+
+
 # 3. `Y -> Success/Failure -> X`: after all chunks received, Y sends success/failure to X
 
 # Status packets
