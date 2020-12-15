@@ -22,11 +22,11 @@ python ./scripts/setup.py install
 
 #### Running the server
 ```bash
-PYTHONPATH=$PYTHONPATH:. ./bin/securedrop_server
+./bin/securedrop_server
 ```
 #### Running the client
 ```bash
-PYTHONPATH=$PYTHONPATH:. ./bin/securedrop
+./bin/securedrop
 ```
 ### Running with executable arguments
 #### Running the server
@@ -40,7 +40,12 @@ PYTHONPATH=$PYTHONPATH:. ./bin/securedrop
 
 ## Code
 ### Important Files
-
+Key files for this project include: server.py, client.py, client_server_base.py, and p2p.py. 
+The server.py file handles the runtime server, authentication, client data, and registered users
+from the server side. The client.py file handles registered users on the client side, 
+and the client shell. The client_server_base.py file handles the initialization 
+(port number, host, etc.) of the client and server objects. 
+The p2p.py handles file transfer between users
 ### Modularity
 The project (with its extensive use of classes) takes an object oriented approach to solving key problems. 
 As an example of code reusability, see the conventions for the ‘packet’ classes. 
@@ -52,6 +57,15 @@ Securedrop has also been thoroughly tested. From project root, unit tests can be
 ./securedrop/tests directory.  
 
 ## Security
+Below is a list of the security features we implemented
+```
+* Email Validation
+* Password length enforcement 
+* Transport Layer Security (TLS)
+* HMAC
+* AES
+* SHA256
 
+```
 ## License
 [MIT](LICENSE)
