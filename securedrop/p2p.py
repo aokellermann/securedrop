@@ -22,7 +22,6 @@ class P2PClient(ClientBase):
 
         progress = shared_memory.SharedMemory(self.progress_shm_name)
         try:
-
             total_chunks = ceil(self.in_file_size / FILE_TRANSFER_P2P_CHUNK_SIZE)
             file_info = {
                 "name": os.path.basename(self.in_filename),

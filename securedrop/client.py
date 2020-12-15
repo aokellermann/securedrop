@@ -25,6 +25,7 @@ from securedrop.status_packets import StatusPackets
 from securedrop.utils import sha256_file, sizeof_fmt
 from securedrop.utils import validate_and_normalize_email
 
+DEFALT_SERVER_CERT_PATH = 'server.pem'
 DEFAULT_FILENAME = 'client.json'
 LIST_CONTACTS_TEST_FILENAME = 'list_contacts_test.json'
 DEFAULT_HOSTNAME = '127.0.0.1'
@@ -95,7 +96,7 @@ class Client(ClientBase):
             print("Exiting SecureDrop")
             raise e
 
-    async def main(self, server_cert_path="server.pem"):
+    async def main(self, server_cert_path=DEFALT_SERVER_CERT_PATH):
         try:
             await super().main()
 
