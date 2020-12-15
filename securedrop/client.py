@@ -295,11 +295,9 @@ class Client(ClientBase):
         listen_port = shared_memory.SharedMemory(create=True, size=4)
 
         # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
-        p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name, status_sentinel.name)
-        p2p_server_process = Process(target=p2p_server.run, args=(
-            0,
-            server_sentinel.name
-        ))
+        p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name,
+                               status_sentinel.name)
+        p2p_server_process = Process(target=p2p_server.run, args=(0, server_sentinel.name))
         p2p_server_process.start()
 
         print("Started P2P server. Waiting for listen...")
@@ -319,9 +317,10 @@ class Client(ClientBase):
         chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
 
         def unguarded_print_received_progress(final=False):
-            utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
-                                                   int.from_bytes(progress.buf[4:8], byteorder='little'),
-                                                   chunk_size), "received", final)
+            utils.print_status(
+                *utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                                    int.from_bytes(progress.buf[4:8], byteorder='little'), chunk_size), "received",
+                final)
 
         def print_received_progress():
             while True:
@@ -414,9 +413,10 @@ class Client(ClientBase):
             chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
 
             def unguarded_print_sent_progress(final=False):
-                utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
-                                                       int.from_bytes(progress.buf[4:8], byteorder='little'),
-                                                       chunk_size), "sent", final)
+                utils.print_status(
+                    *utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                                        int.from_bytes(progress.buf[4:8], byteorder='little'), chunk_size), "sent",
+                    final)
 
             def print_sent_progress():
                 while not sentinel:

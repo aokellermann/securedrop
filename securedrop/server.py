@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 
-import os
 import base64
 import json
+import os
+from logging import getLogger
 from multiprocessing import shared_memory
 
-from Crypto.Random import get_random_bytes
+import Crypto.Util.Padding
 from Crypto.Cipher import AES
 from Crypto.Hash import SHAKE256, SHA256, SHA512
 from Crypto.Protocol.KDF import PBKDF2
-import Crypto.Util.Padding
-from logging import getLogger
+from Crypto.Random import get_random_bytes
 
 from securedrop import ServerBase
-from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
-from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
-from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
+from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME
+from securedrop.List_Contacts_Response_Packets import ListContactsResponsePackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
 from securedrop.file_transfer_packets import FILE_TRANSFER_REQUEST_TRANSFER_PACKETS_NAME, FileTransferRequestPackets, \
-    FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME, FILE_TRANSFER_CHECK_REQUESTS_RESPONSE_PACKETS_NAME, \
-    FileTransferCheckRequestsPackets, FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME, FileTransferAcceptRequestPackets, \
+    FILE_TRANSFER_CHECK_REQUESTS_PACKETS_NAME, FileTransferCheckRequestsPackets, \
+    FILE_TRANSFER_ACCEPT_REQUEST_PACKETS_NAME, FileTransferAcceptRequestPackets, \
     FileTransferSendTokenPackets, FILE_TRANSFER_SEND_PORT_PACKETS_NAME, FileTransferSendPortPackets, \
     FileTransferSendPortTokenPackets
-from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
-from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
+from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
+from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
+from securedrop.status_packets import StatusPackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
