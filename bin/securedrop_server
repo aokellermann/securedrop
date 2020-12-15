@@ -15,6 +15,7 @@ if __name__ == "__main__":
         os.mkdir(securedrop_dir)
         if not os.path.exists(securedrop_dir):
             raise RuntimeError("Failed to create securedrop directory: $HOME/.securedrop")
+
     securedrop_file = os.path.join(securedrop_dir, "server_db.json")
     securedrop_port = None
     verbose_flag = False

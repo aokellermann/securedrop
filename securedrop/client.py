@@ -1,18 +1,31 @@
 #!/usr/bin/env python3
-
-import json
 import getpass
+import json
 import os
+import select
+import sys
+import time
+from multiprocessing import Process, shared_memory, Lock
+from threading import Thread
 
+import nest_asyncio
+
+from securedrop import utils
+from securedrop.List_Contacts_Packets import ListContactsPackets
+from securedrop.List_Contacts_Response_Packets import ListContactsResponsePackets
+from securedrop.add_contact_packets import AddContactPackets
 from securedrop.client_server_base import ClientBase
-from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
-from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
-from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
-from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
-from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
-from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
+from securedrop.file_transfer_packets import FileTransferRequestPackets, FileTransferRequestResponsePackets, \
+    FileTransferCheckRequestsPackets, FileTransferAcceptRequestPackets, FileTransferSendTokenPackets, \
+    FileTransferSendPortPackets, FileTransferSendPortTokenPackets, FILE_TRANSFER_P2P_CHUNK_SIZE
+from securedrop.login_packets import LoginPackets
+from securedrop.p2p import P2PClient, P2PServer
+from securedrop.register_packets import RegisterPackets
+from securedrop.status_packets import StatusPackets
+from securedrop.utils import sha256_file, sizeof_fmt
 from securedrop.utils import validate_and_normalize_email
 
+DEFALT_SERVER_CERT_PATH = 'server.pem'
 DEFAULT_FILENAME = 'client.json'
 LIST_CONTACTS_TEST_FILENAME = 'list_contacts_test.json'
 DEFAULT_HOSTNAME = '127.0.0.1'
@@ -83,9 +96,10 @@ class Client(ClientBase):
             print("Exiting SecureDrop")
             raise e
 
-    async def main(self):
-        await super().main()
+    async def main(self, server_cert_path=DEFALT_SERVER_CERT_PATH):
         try:
+            await super().main()
+
             if not self.users.users:
                 decision = input(
                     "No users are registered with this client.\nDo you want to register a new user (y/n)? ")
@@ -103,9 +117,10 @@ class Client(ClientBase):
                     await self.sh()
                 else:
                     raise RuntimeError("Login failed.")
-        except Exception as e:
+        except KeyboardInterrupt:
+            pass
+        finally:
             print("Exiting SecureDrop")
-            raise e
 
     async def register(self):
         msg, email = None, None
@@ -142,23 +157,33 @@ class Client(ClientBase):
         try:
             print("Welcome to SecureDrop")
             print("Type \"help\" For Commands")
+            prompt = True
             while True:
-                cmd = input("secure_drop> ")
-                if cmd == "help":
-                    print("\"add\"  \t-> Add a new contact")
-                    print("\"list\"  \t-> List all online contacts")
-                    print("\"send\"  \t-> Transfer file to contact")
-                    print("\"exit\"  \t-> Exit SecureDrop")
-                elif cmd == "add":
-                    await self.add_contact()
-                elif cmd == "list":
-                    await self.list_contacts()
-                elif cmd == "send":
-                    pass
-                elif cmd == "exit":
-                    break
+                if prompt:
+                    print("secure_drop> ", end="", flush=True)
+                    prompt = False
+                if select.select([sys.stdin], [], [], 1)[0]:
+                    cmd = input().strip()
+                    if cmd == "help":
+                        print("\"add\"  \t-> Add a new contact")
+                        print("\"list\"  \t-> List all online contacts")
+                        print("\"send\"  \t-> Transfer file to contact")
+                        print("\"exit\"  \t-> Exit SecureDrop")
+                    elif cmd == "add":
+                        await self.add_contact()
+                    elif cmd == "list":
+                        await self.list_contacts()
+                    elif cmd == "send":
+                        await self.send_file()
+                    elif cmd == "exit":
+                        break
+                    else:
+                        print("Unknown command: {}".format(cmd))
+                    prompt = True
 
-        except Exception as e:
+                if (await self.check_for_file_transfer_requests()) is not None:
+                    prompt = True
+        except Exception or KeyboardInterrupt as e:
             print("Exiting SecureDrop")
             raise e
 
@@ -208,9 +233,225 @@ class Client(ClientBase):
         if msg != "":
             print("Failed to list contacts: ", msg)
 
+    # Y
+    async def check_for_file_transfer_requests(self):
+        # 2. `Y -> S`: every one second, Y asks server for any requests
+        await self.write(bytes(FileTransferRequestResponsePackets()))
+
+        # 3. `S -> X/F -> Y`: server responds with active requests
+        file_transfer_requests = FileTransferCheckRequestsPackets(data=(await self.read())[4:]).requests
+        if not file_transfer_requests:
+            return
+
+        print("Incoming file transfer request(s):")
+        index_to_email = dict()
+        index_to_file_info = dict()
+        i = 1
+        for email, file_info in file_transfer_requests.items():
+            print("\t{}. {}".format(i, email))
+            print("\t\tname: ", file_info["name"])
+            print("\t\tsize: ", sizeof_fmt(int(file_info["size"])))
+            print("\t\tSHA256: ", file_info["SHA256"])
+            index_to_email[i] = email
+            index_to_file_info[i] = file_info
+            i += 1
+
+        try:
+            selection = input("\nEnter the number for which request you'd like to accept, or 0 to deny all: ")
+            accept = True
+            selection_num = int(selection)
+            if selection_num <= 0 or selection_num >= i:
+                raise ValueError
+
+            packets = FileTransferAcceptRequestPackets(index_to_email[selection_num])
+        except ValueError or KeyboardInterrupt:
+            packets = FileTransferAcceptRequestPackets("")
+            accept = False
+
+        if accept:
+            while True:
+                out_directory = input("Enter the output directory: ")
+                file_path = os.path.join(out_directory, index_to_file_info[selection_num]["name"])
+                if not os.path.isdir(out_directory):
+                    print("The path {} is not a directory".format(os.path.abspath(out_directory)))
+                elif os.path.exists(file_path):
+                    print("The file {} already exists".format(file_path))
+                elif not os.access(out_directory, os.X_OK | os.W_OK):
+                    print("Cannot write file path {} permission denied.".format(file_path))
+                else:
+                    break
+
+        # 4. `Y -> Yes/No -> S`: Y accepts or denies transfer request
+        await self.write(bytes(packets))
+        if not accept:
+            return False
+
+        # 5. `S -> Token -> Y`: if Y accepted, server sends a unique token Y
+        token = FileTransferSendTokenPackets(data=(await self.read())[4:]).token
+
+        lock = Lock()
+        progress = shared_memory.SharedMemory(create=True, size=8)
+        server_sentinel = shared_memory.SharedMemory(create=True, size=1)
+        status_sentinel = shared_memory.SharedMemory(create=True, size=1)
+        listen_port = shared_memory.SharedMemory(create=True, size=4)
+
+        # 6. `Y -> Port -> S`: Y binds to 0 (OS chooses) and sends the port it's listening on to S
+        p2p_server = P2PServer(token, os.path.abspath(out_directory), progress.name, lock, listen_port.name,
+                               status_sentinel.name)
+        p2p_server_process = Process(target=p2p_server.run, args=(0, server_sentinel.name))
+        p2p_server_process.start()
+
+        print("Started P2P server. Waiting for listen...")
+
+        # wait for listen
+        port = 0
+        while port == 0:
+            with lock:
+                port = int.from_bytes(listen_port.buf, byteorder='little')
+
+        await self.write(bytes(FileTransferSendPortPackets(port)))
+
+        # Wait until file received
+
+        time_start = time.time()
+
+        chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
+
+        def unguarded_print_received_progress(final=False):
+            utils.print_status(
+                *utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                                    int.from_bytes(progress.buf[4:8], byteorder='little'), chunk_size), "received",
+                final)
+
+        def print_received_progress():
+            while True:
+                with lock:
+                    if status_sentinel.buf[0] == 1:
+                        break
+                    unguarded_print_received_progress()
+                time.sleep(0.03)
+
+        status_thread = Thread(target=print_received_progress)
+        status_thread.start()
+        try:
+            p2p_server_process.join()
+        except KeyboardInterrupt:
+            raise RuntimeError("User requested abort")
+        finally:
+            if p2p_server_process.is_alive():
+                p2p_server_process.terminate()
+            with lock:
+                status_sentinel.buf[0] = 1
+            status_thread.join()
+            unguarded_print_received_progress(final=True)
+            progress.close()
+            progress.unlink()
+            server_sentinel.close()
+            server_sentinel.unlink()
+            status_sentinel.close()
+            status_sentinel.unlink()
+            listen_port.close()
+            listen_port.unlink()
+
+            time_end = time.time()
+
+        print("File transfer completed successfully in {} seconds.".format(time_end - time_start))
+        return True
+
+    # X
+    async def send_file(self):
+        msg = None
+        try:
+            # 1. `X -> Y/F -> S`: X wants to send F to Y
+
+            recipient_email = input("Enter the recipient's email address: ")
+            file_path = os.path.abspath(input("Enter the file path: "))
+            valid_email = validate_and_normalize_email(recipient_email)
+            if valid_email is None:
+                raise RuntimeError("Invalid Email Address.")
+            if not file_path:
+                raise RuntimeError("Empty file path.")
+            if not os.path.exists(file_path):
+                raise RuntimeError("Cannot find file: {}".format(file_path))
+            if not os.path.isfile(file_path):
+                raise RuntimeError("Not a file: {}".format(file_path))
+
+            file_base = os.path.basename(file_path)
+            file_size = os.path.getsize(file_path)
+            file_sha256 = sha256_file(file_path)
+            file_info = {
+                "name": file_base,
+                "size": file_size,
+                "SHA256": file_sha256,
+            }
+
+            # send request
+            await self.write(bytes(FileTransferRequestPackets(valid_email, file_info)))
+
+            # this only checks if the request is valid
+            # this does not check if the recipient accepted or denied the request
+            msg = StatusPackets(data=(await self.read())[4:]).message
+            if msg != "":
+                raise RuntimeError(msg)
+
+            # 7. `S -> Token/Port -> X`: S sends the same token and port to X
+
+            # denied request is indicated by empty token and port
+            port_and_token = FileTransferSendPortTokenPackets(data=(await self.read())[4:])
+            port, token = port_and_token.port, port_and_token.token
+            if token and port:
+                print("User {} accepted the file transfer Connecting to recipient on port ".format(valid_email, port))
+            else:
+                raise RuntimeError("User {} declined the file transfer request".format(valid_email))
+
+            progress = shared_memory.SharedMemory(create=True, size=8)
+            progress_lock = Lock()
+            p2p_client = P2PClient(port, token, file_path, file_size, file_sha256, progress.name, progress_lock)
+
+            time_start = time.time()
+            sentinel = False
+
+            chunk_size = FILE_TRANSFER_P2P_CHUNK_SIZE
+
+            def unguarded_print_sent_progress(final=False):
+                utils.print_status(
+                    *utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
+                                        int.from_bytes(progress.buf[4:8], byteorder='little'), chunk_size), "sent",
+                    final)
+
+            def print_sent_progress():
+                while not sentinel:
+                    with progress_lock:
+                        unguarded_print_sent_progress()
+                    time.sleep(0.03)
+
+            # i was having trouble with asyncio.gather, so just run status printer in a new thread
+            status_thread = Thread(target=print_sent_progress)
+            status_thread.start()
+
+            # wait until p2p transfer completes, unless keyboard interrupt
+            try:
+                await p2p_client.main()
+            except KeyboardInterrupt:
+                raise RuntimeError("User requested abort")
+            finally:
+                sentinel = True
+                status_thread.join()
+                unguarded_print_sent_progress(final=True)
+                progress.close()
+                progress.unlink()
+                time_end = time.time()
+
+            print("\nFile transfer completed in {} seconds.".format(time_end - time_start))
+
+        except RuntimeError as e:
+            msg = str(e)
+        if msg != "":
+            print("Failed to send file: ", msg)
+
 
 def main(hostname=None, port=None, filename=None, debug=None):
-
+    nest_asyncio.apply()
     hostname = hostname if hostname is not None else DEFAULT_HOSTNAME
     port = port if port is not None else DEFAULT_PORT
     filename = filename if filename is not None else DEFAULT_FILENAME
