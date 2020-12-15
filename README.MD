@@ -8,13 +8,13 @@ Securedrop is a command line application that facilitates the secure transfer of
 ### Clone and Build
 ```bash
 git clone https://github.com/aokellermann/securedrop
-cd ./securedrop
-python ./scripts/setup.py build
+cd securedrop
+python setup.py build
 ```
 
 ### Install dependencies 
 ```bash
-python ./setup.py install
+python setup.py install --skip-build --optimize=1 --prefix=/usr --root build
 ```
 ## Usage
 
@@ -22,20 +22,20 @@ python ./setup.py install
 
 #### Running the server
 ```bash
-./bin/securedrop_server
+bin/securedrop_server
 ```
 #### Running the client
 ```bash
-./bin/securedrop
+bin/securedrop
 ```
 ### Running with executable arguments
 #### Running the server
 ```bash
-./bin/securedrop_server --port 6789 --file example_file.json --verbose
+bin/securedrop_server --port 6789 --file example_file.json --verbose
 ```
 #### Running the client
 ```bash
-./bin/securedrop --port 6789 --address 127.0.0.1 -f example_file_2.json --verbose 
+bin/securedrop --port 6789 --address 127.0.0.1 -f example_file_2.json --verbose 
 ```
 
 ## Code
