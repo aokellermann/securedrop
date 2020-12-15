@@ -32,8 +32,10 @@ def sha256_file(path: str):
         while chunk := file.read(chunk_size):
             hasher.update(chunk)
             chunks_so_far += 1
-            print_hash_progress()
+            if chunks_so_far % 10 == 0:
+                print_hash_progress()
 
+        print_hash_progress()
         return hasher.hexdigest()
 
 

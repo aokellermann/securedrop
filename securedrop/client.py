@@ -324,7 +324,7 @@ class Client(ClientBase):
                     utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
                                                            int.from_bytes(progress.buf[4:8], byteorder='little'),
                                                            chunk_size), "received")
-                time.sleep(0.1)
+                time.sleep(0.03)
             print()
 
         status_thread = Thread(target=print_received_progress)
@@ -412,7 +412,7 @@ class Client(ClientBase):
                         utils.print_status(*utils.get_progress(int.from_bytes(progress.buf[0:4], byteorder='little'),
                                                                int.from_bytes(progress.buf[4:8], byteorder='little'),
                                                                chunk_size), "sent")
-                    time.sleep(0.1)
+                    time.sleep(0.03)
                 print()
 
             # i was having trouble with asyncio.gather, so just run status printer in a new thread
