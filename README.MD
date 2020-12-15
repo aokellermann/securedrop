@@ -1,4 +1,4 @@
-# Securedrop
+# securedrop
 
 Securedrop is a command line application that facilitates the secure transfer of files between users in a peer-to-peer network.
 
