@@ -9,11 +9,16 @@ from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
+from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_FILENAME = 'client.json'
+LIST_CONTACTS_TEST_FILENAME = 'list_contacts_test.json'
 DEFAULT_HOSTNAME = '127.0.0.1'
 DEFAULT_PORT = 6969
+DEBUG_DEFAULT = False
+DEBUG = False
 
 
 class RegisteredUsers:
@@ -147,7 +152,7 @@ class Client(ClientBase):
                 elif cmd == "add":
                     await self.add_contact()
                 elif cmd == "list":
-                    pass
+                    await self.list_contacts()
                 elif cmd == "send":
                     pass
                 elif cmd == "exit":
@@ -177,11 +182,40 @@ class Client(ClientBase):
         if msg != "":
             print("Failed to add contact: ", msg)
 
+    async def list_contacts(self):
+        msg = ""
+        try:
+            await self.write(bytes(ListContactsPackets()))
+            contact_dict = ListContactsResponsePackets(data=(await self.read())[4:]).contacts
+            # print contacts by Email and Name
+            if len(contact_dict) > 0:
+                print("Email:\t\t\t\tName:")
+                for email, name in contact_dict.items():
+                    print(email + "\t\t\t" + name)
+            else:
+                print("No contacts online!")
 
-def main(hostname=None, port=None, filename=None):
+            if DEBUG:
+                try:
+                    with open(LIST_CONTACTS_TEST_FILENAME, 'w') as f:
+                        json.dump(contact_dict, f)
+                except RuntimeError as e:
+                    msg = str(e)
+
+        except RuntimeError as e:
+            msg = str(e)
+
+        if msg != "":
+            print("Failed to list contacts: ", msg)
+
+
+def main(hostname=None, port=None, filename=None, debug=None):
+
     hostname = hostname if hostname is not None else DEFAULT_HOSTNAME
     port = port if port is not None else DEFAULT_PORT
     filename = filename if filename is not None else DEFAULT_FILENAME
+    global DEBUG
+    DEBUG = debug if debug is not None else DEBUG_DEFAULT
     Client(hostname, port, filename).run()
 
 

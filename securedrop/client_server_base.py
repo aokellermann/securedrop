@@ -1,10 +1,13 @@
 import ssl
 
+from logging import getLogger
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.iostream import StreamClosedError
 from tornado.tcpclient import TCPClient
 from tornado.tcpserver import TCPServer
 from multiprocessing import shared_memory
+
+log = getLogger()
 
 
 async def read(stream):
@@ -26,29 +29,29 @@ class ClientBase:
         self.port = port
 
     def run(self, timeout=None):
-        print("Client starting main loop")
+        log.debug("Client starting main loop")
         try:
             IOLoop.current().run_sync(self.main, timeout)
         finally:
-            print("Client exiting main loop")
+            log.debug("Client exiting main loop")
 
     async def main(self):
-        print("Client starting connection")
+        log.debug("Client starting connection")
         ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         ssl_ctx.load_verify_locations('server.pem')
         ssl_ctx.load_cert_chain('server.pem')
         ssl_ctx.check_hostname = False
         self.stream = await TCPClient().connect('127.0.0.1', self.port, ssl_options=ssl_ctx)
-        print("Client connected")
+        log.debug("Client connected")
 
     async def read(self):
         data = await read(self.stream)
-        print("Client read bytes: ", data[:80])
+        log.debug("Client read bytes: {}".format(data[:80]))
         return data
 
     async def write(self, data: bytes):
         await write(self.stream, data)
-        print("Client wrote bytes: ", data[:80])
+        log.debug("Client wrote bytes: {}".format(data[:80]))
 
 
 class ServerBase(TCPServer):
@@ -59,36 +62,36 @@ class ServerBase(TCPServer):
         self.shm = None
 
     def run(self, port, shm_name):
-        print("Server starting")
+        log.debug("Server starting")
         self.shm = shared_memory.SharedMemory(shm_name)
         self.listen(port)
-        print("Server starting main loop")
+        log.debug("Server starting main loop")
         try:
             PeriodicCallback(self.check_stop, 100).start()
             IOLoop.current().start()
         finally:
             self.shm.close()
             self.shm = None
-            print("Server exiting main loop")
+            log.debug("Server exiting main loop")
 
     def check_stop(self):
         if self.shm.buf[0] == 1:
             IOLoop.current().add_callback(IOLoop.current().stop)
 
     async def handle_stream(self, stream, address):
-        print("Server accepted connection at host ", address)
+        log.info("Server accepted connection at host {}".format(address))
         await stream.wait_for_handshake()
         while True:
             try:
                 data = await read(stream)
-                print("Server read bytes: ", data[:80])
+                log.debug("Server read bytes: {}".format(data[:80]))
                 await self.on_data_received(data, stream)
             except StreamClosedError:
-                print("Server lost client at host ", address)
+                log.info("Server lost client at host {}".format(address))
                 await self.on_stream_closed(stream)
                 break
             except Exception as e:
-                print("Server caught exception: ", e)
+                log.error("Server caught exception: {}".format(e))
 
     async def on_data_received(self, data, stream):
         pass
@@ -98,4 +101,4 @@ class ServerBase(TCPServer):
 
     async def write(self, stream, data: bytes):
         await write(stream, data)
-        print("Server wrote bytes: ", data[:80])
+        log.debug("Server wrote bytes: {}".format(data[:80]))

@@ -10,16 +10,22 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHAKE256, SHA256, SHA512
 from Crypto.Protocol.KDF import PBKDF2
 import Crypto.Util.Padding
+from logging import getLogger
 
 from securedrop import ServerBase
 from securedrop.register_packets import REGISTER_PACKETS_NAME, RegisterPackets
 from securedrop.status_packets import STATUS_PACKETS_NAME, StatusPackets
 from securedrop.login_packets import LOGIN_PACKETS_NAME, LoginPackets
 from securedrop.add_contact_packets import ADD_CONTACT_PACKETS_NAME, AddContactPackets
+
+from securedrop.List_Contacts_Packets import LIST_CONTACTS_PACKETS_NAME, ListContactsPackets
+from securedrop.List_Contacts_Response_Packets import LIST_CONTACTS_RESPONSE_PACKETS_NAME, ListContactsResponsePackets
 from securedrop.utils import validate_and_normalize_email
 
 DEFAULT_filename = 'server.json'
 DEFAULT_PORT = 6969
+
+log = getLogger()
 
 
 def make_salt():
@@ -149,19 +155,19 @@ class RegisteredUsers:
             return "User already exists."
         self.users[email_hash] = ClientData(name=name, email=valid_email, password=password, contacts=dict())
         self.write_json()
-        print("User Registered.")
+        log.info("User Registered.")
         return ""
 
     def login(self, email, password):
         email_hash = SHA256.new(email.encode()).hexdigest()
         if email_hash not in self.users:
-            print("Email and Password Combination Invalid.")
+            log.info("Email and Password Combination Invalid.")
             return "Email and Password Combination Invalid."
 
         user = self.users[email_hash]
         auth = Authentication(str(password), user.auth.salt)
         if auth != self.users[email_hash].auth:
-            print("Email and Password Combination Invalid.")
+            log.info("Email and Password Combination Invalid.")
             return "Email and Password Combination Invalid."
 
         user.email = email
@@ -182,6 +188,12 @@ class RegisteredUsers:
         self.write_json()
         return ""
 
+    def get_contacts(self, email):
+        if not email:
+            return "Invalid email address"
+        email_hash = SHA256.new(email.encode()).hexdigest()
+        return self.users[email_hash].contacts if email_hash in self.users else dict()
+
 
 class Server(ServerBase):
     def __init__(self, filename):
@@ -192,7 +204,7 @@ class Server(ServerBase):
 
     async def on_data_received(self, data, stream):
         if len(data) < 4:
-            print("Server sent invalid data")
+            log.error("Server sent invalid data")
             return
 
         prefix = data[:4]
@@ -203,6 +215,8 @@ class Server(ServerBase):
             await self.process_login(LoginPackets(data=data), stream)
         elif prefix == ADD_CONTACT_PACKETS_NAME:
             await self.add_contact(AddContactPackets(data=data), stream)
+        elif prefix == LIST_CONTACTS_PACKETS_NAME:
+            await self.list_contacts(stream)
 
     async def on_stream_closed(self, stream):
         if stream not in self.sock_to_email:
@@ -210,30 +224,48 @@ class Server(ServerBase):
         email = self.sock_to_email[stream]
         del self.sock_to_email[stream]
         del self.email_to_sock[email]
-        print("removed ", email, " from online connections")
+        log.info("removed {} from online connections".format(email))
 
     async def write_status(self, stream, msg):
         await self.write(stream, bytes(StatusPackets(msg)))
+
+    async def write_list_contacts_response(self, stream, contacts_dict):
+        await self.write(stream, bytes(ListContactsResponsePackets(contacts_dict)))
 
     async def process_register(self, reg, stream):
         msg = self.users.register_new_user(reg.name, reg.email, reg.password)
         if msg == "":
             self.email_to_sock[reg.email] = stream
             self.sock_to_email[stream] = reg.email
-            print("added ", reg.email, " to online connections")
+            log.info("added {} to online connections".format(reg.email))
         await self.write_status(stream, msg)
 
-    async def process_login(self, log, stream):
-        msg = self.users.login(log.email, log.password)
+    async def process_login(self, login, stream):
+        msg = self.users.login(login.email, login.password)
         if msg == "":
-            self.email_to_sock[log.email] = stream
-            self.sock_to_email[stream] = log.email
-            print("added ", log.email, " to online connections")
+            self.email_to_sock[login.email] = stream
+            self.sock_to_email[stream] = login.email
+            log.info("added {} to online connectionds".format(login.email))
         await self.write_status(stream, msg)
 
     async def add_contact(self, addc, stream):
         msg = self.users.add_contact(self.sock_to_email[stream], addc.name, addc.email)
         await self.write_status(stream, msg)
+
+    async def list_contacts(self, stream):
+        # three verification steps
+        current_user_email = self.sock_to_email[stream]
+        # 1: contacts_dict contains the names and email adresses that a user has added
+        contacts_dict = self.users.get_contacts(current_user_email)
+        contacts_dict_send = dict()
+
+        for email, name in contacts_dict.items():
+            # 2: check if a user's contacts have also added the current user as a contact.
+            # 3: check if the user is online.
+            if email in self.email_to_sock and current_user_email in self.users.get_contacts(email):
+                contacts_dict_send[email] = name
+
+        await self.write_list_contacts_response(stream, contacts_dict_send)
 
 
 class ServerDriver:
@@ -258,7 +290,7 @@ class ServerDriver:
             server = Server(self.filename)
             server.run(self.port, self.sentinel_name())
         except Exception:
-            print("Caught exception. Exiting...")
+            log.error("Caught exception. Exiting...")
         finally:
             self.sentinel.buf[0] = 1
 
